@@ -1,2 +1,3 @@
-# ocr_legacy_allometry
-OCR PDF of old allometry data
+# OCR Legacy Allometry Data
+
+OCR PDFs of old allometry data.
