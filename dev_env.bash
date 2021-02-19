@@ -6,7 +6,9 @@ if [[ ! -z "$VIRTUAL_ENV" ]]; then
 fi
 
 rm -rf venv
-virtualenv -p python3.9 venv
+
+# numba currently does not pip install for python 3.9
+virtualenv -p python3.8 venv
 
 source ./venv/bin/activate
 
