@@ -7,8 +7,7 @@ fi
 
 rm -rf venv
 
-# numba currently does not pip install for python 3.9
-virtualenv -p python3.8 venv
+virtualenv -p python3.9 venv
 
 source ./venv/bin/activate
 
