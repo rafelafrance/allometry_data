@@ -1,19 +1,31 @@
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Environments
-.env
-.venv
-env/
+# Environment data
 venv/
+.env
 
-# Editors
-.spyderproject
+# IDE directories
+.ipynb_checkpoints
+.ropeproject
+.idea
 .spyproject
-.idea/
-.vscode/
+.vscode
 
-# data
+# Compiled python modules
+__pycache__
+
+# Temp data
+junk*
+old/
+temp/
+
 data/
-#output/
+
+# testing
+/coverage
+
+# misc
+.~lock*
+papers/
+old_allometry/
+data/
+output/
 junk*
