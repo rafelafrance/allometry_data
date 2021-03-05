@@ -1,8 +1,8 @@
 """Common functions for dealing with fonts."""
 
-from itertools import cycle
 from os.path import basename, splitext
 from pathlib import Path
+from random import choice
 
 FONTS_DIR = Path('.') / 'fonts'
 
@@ -31,12 +31,10 @@ FONT_PARAMS = {
     'OcrB2': {},
 }
 
-AAA = cycle(FONTS)
-
 
 def choose_font():
     """Randomly select a font to use for the image."""
-    font = next(AAA)  # choice(FONTS)
+    font = choice(FONTS)
     name = splitext(basename(font))[0]
     is_bold = name.lower().find('bold') > -1
 

@@ -9,7 +9,7 @@ from random import choice, randint, random, randrange
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
-# from tqdm import tqdm
+from tqdm import tqdm
 
 from allometry.consts import CLEAN_DIR, DIRTY_DIR
 from allometry.font_util import choose_font
@@ -112,7 +112,6 @@ def build_page(args, page):
     name = page.stem + '.jpg'
 
     font, font_size, image_filter, snow_fract = choose_font()
-    print(font, font_size, image_filter, snow_fract)
 
     clean = clean_image(data, font, font_size)
     if args.clean_dir:
@@ -139,8 +138,7 @@ def generate_images(args):
             for path in Path(args.dirty_dir).glob('*.jpg'):
                 path.unlink()
 
-    # for page in tqdm(pages):
-    for page in pages:
+    for page in tqdm(pages):
         build_page(args, page)
 
 

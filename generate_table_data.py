@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Generate fake table data."""
 
+import argparse
+import json
 import string
+import textwrap
+import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from random import choice, randint, random, seed
 
 from allometry.consts import ITIS_DIR, SEED
@@ -12,6 +17,9 @@ seed(SEED)
 GUTTER = ' ' * 6  # Spaces between columns
 
 UF_CHARS = string.ascii_uppercase + string.digits
+
+MIN_ROWS = 50
+MAX_ROWS = 76
 
 HIGH = 9.999999
 SUB = HIGH / 2.0
@@ -87,19 +95,6 @@ def fake_float(after=4, neg=False):
     return formatted
 
 
-# ## Generate fake page text
-
-# Generate a fake table.
-#
-# **Note that there will be other table formats.**
-
-# In[12]:
-
-
-MIN_ROWS = 50
-MAX_ROWS = 76
-
-
 def fake_data():
     """Generate the table body."""
     count = randint(MIN_ROWS, MAX_ROWS) + 1
@@ -170,41 +165,7 @@ def fake_column_headers():
     return column_headers
 
 
-# def generate_images(args):
-#     """Generate the images for the pages."""
-#     pages = list(Path(args.text_dir).glob('*.json'))
-#     if args.count and args.count < len(pages):
-#         pages = pages[:args.count]
-#
-#     for i in tqdm(pages):
-#         font_file = choice(FONTS)
-#
-#         font_name = splitext(basename(font_file))[0]
-#         base_name = f'table_{str(i).zfill(3)}'
-#
-#         params = FONT_PARAMS.get(font_name, {})
-#         clean_params = {
-#             'font': font_file,
-#             'font_size': params.get('size', 36),
-#         }
-#         dirty_params = {
-#             'snow_fract': params.get('snow', 0.05),
-#             'image_filter': params.get('filter', 'max'),
-#         }
-#
-#         data = build_page(
-#             args, base_name,
-#             clean_params=clean_params,
-#             dirty_params=dirty_params)
-#
-#         data['clean'] = clean_params
-#         data['dirty'] = dirty_params
-#
-#         with open(TEXT_DIR / (base_name + '.json'), 'w') as json_file:
-#             json.dump(data, json_file, indent='  ')
-
-
-def fake_page():
+def generate_table():
     """Create a fake table."""
     rows = fake_data()
     lines = fake_lines(rows)
@@ -223,4 +184,56 @@ def fake_page():
         'page': page,
     }
 
-    return page, data
+    return data
+
+
+def generate_pages(args):
+    """Generate fake page data."""
+    types = {
+        'table': generate_table,
+    }
+    type_choices = list(types.keys())
+
+    text_dir = Path(args.text_dir)
+
+    if args.remove_pages:
+        for path in Path(args.text_dir).glob('*.json'):
+            path.unlink()
+
+    for i in range(args.count):
+        type_ = choice(type_choices)
+        name = f'{type}_{uuid.uuid4()}.json'
+        data = types[type_]()
+        with open(text_dir / name, 'w') as json_file:
+            json.dump(data, json_file, indent='  ')
+
+
+def parse_args():
+    """Process command-line arguments."""
+    description = """Generate images from text."""
+    arg_parser = argparse.ArgumentParser(
+        description=textwrap.dedent(description),
+        fromfile_prefix_chars='@')
+
+    arg_parser.add_argument(
+        '--text-dir', '-t', required=True,
+        help="""Where is the text data stored.""")
+
+    default = 100
+    arg_parser.add_argument(
+        '--count', '-c', type=int, default=default,
+        help=f"""How many pages to create. Default = {default}.""")
+
+    arg_parser.add_argument(
+        '--remove-pages', '-R', action='store_true',
+        help="""Should we clear all of the existing pages in --text-dir."""
+    )
+
+    args = arg_parser.parse_args()
+
+    return args
+
+
+if __name__ == '__main__':
+    ARGS = parse_args()
+    generate_pages(ARGS)
