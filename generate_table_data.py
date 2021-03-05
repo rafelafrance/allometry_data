@@ -202,7 +202,7 @@ def generate_pages(args):
 
     for i in range(args.count):
         type_ = choice(type_choices)
-        name = f'{type}_{uuid.uuid4()}.json'
+        name = f'{type_}_{uuid.uuid4()}.json'
         data = types[type_]()
         with open(text_dir / name, 'w') as json_file:
             json.dump(data, json_file, indent='  ')
