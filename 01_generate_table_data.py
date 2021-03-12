@@ -11,8 +11,7 @@ from pathlib import Path
 from random import choice, randint, random, seed
 
 from allometry.consts import ITIS_DIR, SEED
-
-seed(SEED)
+from allometry.util import started, finished
 
 GUTTER = ' ' * 6  # Spaces between columns
 
@@ -189,6 +188,8 @@ def generate_table():
 
 def generate_pages(args):
     """Generate fake page data."""
+    seed(args.seed)
+
     types = {
         'table': generate_table,
     }
@@ -219,15 +220,19 @@ def parse_args():
         '--text-dir', '-t', required=True,
         help="""Where is the text data stored.""")
 
-    default = 100
     arg_parser.add_argument(
-        '--count', '-c', type=int, default=default,
-        help=f"""How many pages to create. Default = {default}.""")
+        '--count', '-c', type=int, default=10_000,
+        help="""How many pages to create. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--remove-pages', '-R', action='store_true',
         help="""Should we clear all of the existing pages in --text-dir."""
     )
+
+    arg_parser.add_argument(
+        '--seed', '-S', type=int, default=SEED,
+        help="""Create a random seed for the python. Note: SQLite3 does not
+            use seeds. (default: %(default)s)""")
 
     args = arg_parser.parse_args()
 
@@ -235,5 +240,9 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    started()
+
     ARGS = parse_args()
     generate_pages(ARGS)
+
+    finished()

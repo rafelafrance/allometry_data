@@ -6,3 +6,4 @@ pandas>=1.2.2
 Pillow>=8.1.0
 pytesseract>=0.3.7
 tqdm>=4.56.2
+torch~=1.8.0+cu111
