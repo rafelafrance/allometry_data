@@ -1,3 +1,4 @@
 --text-dir=./data/text
 --clean-dir=./data/clean
 --dirty-dir=./data/dirty
+--count=1024

@@ -51,7 +51,7 @@ class ImageFileDataset(Dataset):
         return dirty, clean, image['shape'], image['name']
 
     @staticmethod
-    def split_files(dirty_dir, clean_dir, *fractions, glob='*.jpg', count=None):
+    def split_files(dirty_dir, clean_dir, *segments, glob='*.jpg', count=None):
         """Split contents of a dir into datasets."""
         clean = {p.name: p for x in Path(clean_dir).glob(glob) if (p := Path(x))}
         dirty = {p.name: p for x in Path(dirty_dir).glob(glob) if (p := Path(x))}
@@ -62,8 +62,8 @@ class ImageFileDataset(Dataset):
 
         splits = []
         start, end = 0, 0
-        for fract in fractions:
-            end = start + round(count * fract)
+        for seg in segments:
+            end = int(start + seg if seg > 1.0 else start + round(count * seg))
             splits.append([(dirty[n], clean[n]) for n in names[start:end]])
             start = end
 

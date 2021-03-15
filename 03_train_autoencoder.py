@@ -9,11 +9,12 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.optim as optim
+from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
-from allometry.metrics import DiceLoss
 from allometry.util import finished, started
 
 
@@ -26,12 +27,13 @@ def train(args):
     device = torch.device(args.device)
     model.to(device)
 
-    criterion = DiceLoss()
+    # criterion = DiceLoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     losses = []
     train_loader, valid_loader = get_loaders(args)
 
-    best_valid = 0.0
+    best_valid = 9999.0
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
@@ -50,7 +52,7 @@ def train(args):
 def train_batches(model, device, criterion, losses, loader, optimizer):
     """Run the training phase of the epoch."""
     model.train()
-    for data in loader:
+    for data in tqdm(loader):
         x, y_true, *_ = data
         x, y_true = x.to(device), y_true.to(device)
         optimizer.zero_grad()
@@ -65,7 +67,7 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
 def valid_batches(model, device, criterion, losses, loader):
     """Run the validating phase of the epoch."""
     model.eval()
-    for data in loader:
+    for data in tqdm(loader):
         x, y_true, *_ = data
         x, y_true = x.to(device), y_true.to(device)
         with torch.set_grad_enabled(False):
@@ -88,7 +90,7 @@ def valid_log(epoch, losses, msg):
 
 def save_model(args, model, epoch, best_valid, curr_valid):
     """Save the model if the current validation score is better than the best one."""
-    if curr_valid > best_valid:
+    if curr_valid < best_valid and epoch % args.check_point == 0:
         path = args.model_dir / f'best_{epoch}.pth'
         torch.save(model.state_dict(), path)
 
@@ -96,7 +98,7 @@ def save_model(args, model, epoch, best_valid, curr_valid):
 def get_loaders(args):
     """Get the data loaders."""
     train_split, valid_split = ImageFileDataset.split_files(
-        args.dirty_dir, args.clean_dir, 0.6, 0.4)
+        args.dirty_dir, args.clean_dir, args.train_split, args.valid_split)
 
     train_dataset = ImageFileDataset(train_split, resize=(512, 512))
     valid_dataset = ImageFileDataset(valid_split, resize=(512, 512))
@@ -127,6 +129,18 @@ def parse_args():
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
         fromfile_prefix_chars='@')
+
+    arg_parser.add_argument(
+        '--train-split', '-t', type=float, required=True,
+        help="""How many records to use for training. If the argument is
+            greater than 1 than it's treated as a count. If 1 or less then it
+            is treated as a fraction.""")
+
+    arg_parser.add_argument(
+        '--valid-split', '-v', type=float, required=True,
+        help="""How many records to use for validation. If the argument is
+            greater than 1 than it's treated as a count. If 1 or less then it
+            is treated as a fraction.""")
 
     arg_parser.add_argument(
         '--clean-dir', '-C', help="""Read clean images from this directory.""")

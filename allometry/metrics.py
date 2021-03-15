@@ -13,7 +13,9 @@ class DiceLoss(nn.Module):
 
     def forward(self, y_pred, y_true):
         """Calculate the dice loss function for binary arrays."""
-        inter = torch.dot(y_pred.view(-1), y_true.view(-1))
-        union = torch.sum(y_pred) + torch.sum(y_true)
+        y_pred = torch.flatten(y_pred)
+        y_true = torch.flatten(y_true)
+        inter = torch.sum(y_pred * y_true)
+        union = torch.sum(y_pred + y_true)
         score = (2.0 * inter + self.eps) / (union + self.eps)
         return 1.0 - score

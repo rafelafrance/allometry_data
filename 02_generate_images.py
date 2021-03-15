@@ -37,7 +37,12 @@ def build_page(args, page):
 
 def generate_images(args):
     """Generate the images for the pages."""
-    pages = sorted(Path(args.text_dir).glob('*.json'))
+    existing = {p.stem for p in args.clean_dir.glob('*.jpg')}
+    existing = set() if args.remove_images else existing
+
+    pages = [p for p in args.text_dir.glob('*.json') if p.stem not in existing]
+    pages = sorted(pages)
+
     if args.count:
         pages = pages[:args.count]
 
@@ -82,6 +87,8 @@ def parse_args():
     )
 
     args = arg_parser.parse_args()
+    if args.text_dir:
+        args.text_dir = Path(args.text_dir)
     if args.clean_dir:
         args.clean_dir = Path(args.clean_dir)
     if args.dirty_dir:

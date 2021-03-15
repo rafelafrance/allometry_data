@@ -1,5 +1,8 @@
 --clean-dir=./data/clean
 --dirty-dir=./data/dirty
 --model-dir=./data/models
---epochs=10
+--train-split=768
+--valid-split=256
+--epochs=100
+--check-point=10
 --batch-size=4
