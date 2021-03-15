@@ -4,11 +4,12 @@
 import argparse
 import logging
 import textwrap
+from pathlib import Path
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
@@ -25,10 +26,9 @@ def train(args):
     device = torch.device(args.device)
     model.to(device)
 
-    loss = DiceLoss()
+    criterion = DiceLoss()
 
-    train_losses = []
-    valid_losses = []
+    losses = []
     train_loader, valid_loader = get_loaders(args)
 
     best_valid = 0.0
@@ -36,48 +36,61 @@ def train(args):
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     for epoch in range(1, args.epochs + 1):
-        train_run(model, device, loss, train_losses, train_loader, optimizer)
-        train_log(epoch)
+        train_batches(model, device, criterion, losses, train_loader, optimizer)
+        msg = train_log(losses)
+        losses = []
 
-        valid_run(model, device, loss, valid_losses, valid_loader)
-        valid_log(epoch)
+        valid_batches(model, device, criterion, losses, valid_loader)
+        curr_valid = valid_log(epoch, losses, msg)
+        losses = []
+
+        save_model(args, model, epoch, best_valid, curr_valid)
 
 
-def train_run(model, device, loss, losses, loader, optimizer):
+def train_batches(model, device, criterion, losses, loader, optimizer):
     """Run the training phase of the epoch."""
     model.train()
-    for data in tqdm(loader):
+    for data in loader:
         x, y_true, *_ = data
         x, y_true = x.to(device), y_true.to(device)
         optimizer.zero_grad()
         with torch.set_grad_enabled(True):
             y_pred = model(x)
-            loss = loss.loss(y_pred, y_true)
-            losses.append(loss.item())
-            loss.backward()
+            batch_loss = criterion(y_pred, y_true)
+            losses.append(batch_loss.item())
+            batch_loss.backward()
             optimizer.step()
 
 
-def valid_run(model, device, loss, losses, loader):
+def valid_batches(model, device, criterion, losses, loader):
     """Run the validating phase of the epoch."""
     model.eval()
-    for data in tqdm(loader):
+    for data in loader:
         x, y_true, *_ = data
         x, y_true = x.to(device), y_true.to(device)
         with torch.set_grad_enabled(False):
             y_pred = model(x)
-            loss = loss.loss(y_pred, y_true)
-            losses.append(loss.item())
+            batch_loss = criterion(y_pred, y_true)
+            losses.append(batch_loss.item())
 
 
-def train_log(epoch):
+def train_log(losses):
     """Clean up after the training epoch."""
-    ...
+    return f'training {np.mean(losses):0.6f}'
 
 
-def valid_log(epoch):
+def valid_log(epoch, losses, msg):
     """Clean up after the validation epoch."""
-    ...
+    avg_loss = np.mean(losses)
+    logging.info(f'Epoch: {epoch: 3d} Average losses {msg} validation {avg_loss:0.6f}')
+    return avg_loss
+
+
+def save_model(args, model, epoch, best_valid, curr_valid):
+    """Save the model if the current validation score is better than the best one."""
+    if curr_valid > best_valid:
+        path = args.model_dir / f'best_{epoch}.pth'
+        torch.save(model.state_dict(), path)
 
 
 def get_loaders(args):
@@ -116,10 +129,13 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--clean-dir', '-C', help="""Save the clean images to this directory.""")
+        '--clean-dir', '-C', help="""Read clean images from this directory.""")
 
     arg_parser.add_argument(
-        '--dirty-dir', '-D', help="""Save the dirty images to this directory.""")
+        '--dirty-dir', '-D', help="""Read dirty images from this directory.""")
+
+    arg_parser.add_argument(
+        '--model-dir', '-M', help="""Save best models to this directory.""")
 
     arg_parser.add_argument(
         '--device', '-d',
@@ -140,10 +156,17 @@ def parse_args():
         help="""Input batch size. (default: %(default)s)""")
 
     arg_parser.add_argument(
+        '--check-point', '-c', type=int, default=10,
+        help="""Check point every c iterations. (default: %(default)s)""")
+
+    arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
 
     args = arg_parser.parse_args()
+
+    if args.model_dir:
+        args.model_dir = Path(args.model_dir)
 
     if not args.device:
         args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'

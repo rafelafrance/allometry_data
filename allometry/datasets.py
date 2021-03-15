@@ -16,7 +16,6 @@ class ImageFileDataset(Dataset):
         """Generate a dataset using pairs of images.
 
         The pairs are in tuples of (dirty_image, clean_image).
-        Resize is used to resize the images.
         """
         self.resize = resize
         self.images = []
@@ -42,9 +41,11 @@ class ImageFileDataset(Dataset):
             clean = clean.resize(self.resize)
 
         dirty = np.array(dirty)
+        dirty /= 255.0
         dirty = dirty[np.newaxis, :, :]
 
         clean = np.array(clean)
+        clean /= 255.0
         clean = clean[np.newaxis, :, :]
 
         return dirty, clean, image['shape'], image['name']

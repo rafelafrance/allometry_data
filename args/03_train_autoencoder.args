@@ -1,4 +1,5 @@
 --clean-dir=./data/clean
 --dirty-dir=./data/dirty
---epochs=1
+--model-dir=./data/models
+--epochs=10
 --batch-size=4
