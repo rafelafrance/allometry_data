@@ -4,5 +4,5 @@
 --train-split=768
 --valid-split=256
 --epochs=100
---check-point=10
+--save-every=10
 --batch-size=4

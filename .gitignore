@@ -17,15 +17,13 @@ junk*
 old/
 temp/
 
+# Data files
 data/
-
-# testing
-/coverage
+runs/
+output/
 
 # misc
 .~lock*
 papers/
 old_allometry/
-data/
-output/
 junk*
