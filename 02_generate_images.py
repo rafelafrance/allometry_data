@@ -5,6 +5,7 @@ import argparse
 import json
 import textwrap
 from pathlib import Path
+from random import seed
 
 from tqdm import tqdm
 
@@ -17,6 +18,9 @@ HEIGHT = 3440
 
 def build_page(args, page):
     """Build images from the data."""
+    if args.seed is not None:
+        seed(args.seed)
+
     with open(page) as data_file:
         data = json.load(data_file)
 
@@ -83,8 +87,12 @@ def parse_args():
     arg_parser.add_argument(
         '--remove-images', '-R', action='store_true',
         help="""Should we clear all of the existing images in the clean &
-            dirty directories."""
-    )
+            dirty directories.""")
+
+    arg_parser.add_argument(
+        '--seed', '-S', type=int,
+        help="""Create a random seed for python. Note: SQLite3 does not
+            use seeds. (default: %(default)s)""")
 
     args = arg_parser.parse_args()
     if args.text_dir:

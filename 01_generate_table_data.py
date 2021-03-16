@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randint, random, seed
 
-from allometry.consts import ITIS_DIR, SEED
-from allometry.util import started, finished
+from allometry.consts import ITIS_DIR
+from allometry.util import finished, started
 
 GUTTER = ' ' * 6  # Spaces between columns
 
@@ -188,7 +188,8 @@ def generate_table():
 
 def generate_pages(args):
     """Generate fake page data."""
-    seed(args.seed)
+    if args.seed is not None:
+        seed(args.seed)
 
     types = {
         'table': generate_table,
@@ -230,8 +231,8 @@ def parse_args():
     )
 
     arg_parser.add_argument(
-        '--seed', '-S', type=int, default=SEED,
-        help="""Create a random seed for the python. Note: SQLite3 does not
+        '--seed', '-S', type=int,
+        help="""Create a random seed for python. Note: SQLite3 does not
             use seeds. (default: %(default)s)""")
 
     args = arg_parser.parse_args()

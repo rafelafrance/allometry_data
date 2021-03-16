@@ -5,6 +5,7 @@ import argparse
 import logging
 import textwrap
 from pathlib import Path
+from random import seed
 
 import numpy as np
 import torch
@@ -22,6 +23,11 @@ from allometry.util import finished, started
 def train(args):
     """Train the neural net."""
     logging.info('Starting training')
+
+    if args.seed is not None:
+        torch.cuda.manual_seed(args.seed)
+        seed(args.seed)
+
     writer = SummaryWriter()
 
     model = Autoencoder()
@@ -199,6 +205,9 @@ def parse_args():
 
     arg_parser.add_argument(
         '--load-model', '-L', help="""Load this state dict to restart the model.""")
+
+    arg_parser.add_argument(
+        '--seed', '-S', type=int, help="""Create a random seed.""")
 
     args = arg_parser.parse_args()
 
