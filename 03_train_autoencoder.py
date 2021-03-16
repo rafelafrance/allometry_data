@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
+# from allometry.metrics import BinaryDiceLoss
 from allometry.util import finished, started
 
 
@@ -36,7 +37,7 @@ def train(args):
     device = torch.device(args.device)
     model.to(device)
 
-    # criterion = DiceLoss()
+    # criterion = BinaryDiceLoss()
     criterion = nn.BCEWithLogitsLoss()
 
     losses = []
