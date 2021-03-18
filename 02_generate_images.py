@@ -75,7 +75,7 @@ def parse_args():
 
     arg_parser.add_argument(
         '--count', '-c', type=int,
-        help="""How many images to create. If omitted then it will process 
+        help="""How many images to create. If omitted then it will process
             all of the files in the --text-dir.""")
 
     arg_parser.add_argument(

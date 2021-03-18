@@ -202,7 +202,7 @@ def generate_pages(args):
         for path in Path(args.text_dir).glob('*.json'):
             path.unlink()
 
-    for i in range(args.count):
+    for _ in range(args.count):
         type_ = choice(type_choices)
         name = f'{type_}_{uuid.uuid4()}.json'
         data = types[type_]()

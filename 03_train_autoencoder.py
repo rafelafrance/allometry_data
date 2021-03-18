@@ -149,7 +149,7 @@ def get_loaders(args):
 
 def parse_args():
     """Process command-line arguments."""
-    description = """Train a denoising autoencoder used to cleanup dirty label 
+    description = """Train a denoising autoencoder used to cleanup dirty label
         images."""
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),

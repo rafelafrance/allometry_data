@@ -8,3 +8,4 @@ pytesseract>=0.3.7
 tensorboard>=2.4.1
 tqdm>=4.56.2
 
+torch~=1.8.0+cu111
