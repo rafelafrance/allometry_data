@@ -1,5 +1,5 @@
---clean-dir=./data/clean
---dirty-dir=./data/dirty
+--clean-dir=./data/train/clean
+--dirty-dir=./data/train/dirty
 --model-dir=./data/models
 --train-split=768
 --valid-split=256

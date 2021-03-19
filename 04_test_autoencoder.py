@@ -4,28 +4,24 @@
 import argparse
 import logging
 import textwrap
-from pathlib import Path
-from random import seed
+from os.path import join
 
 import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torchvision.transforms import ToPILImage
 from tqdm import tqdm
 
+# from allometry.metrics import BinaryDiceLoss
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
 from allometry.util import finished, started
-# from allometry.metrics import BinaryDiceLoss
 
 
 def test(args):
     """Train the neural net."""
     logging.info('Starting testing')
-
-    if args.seed is not None:
-        torch.cuda.manual_seed(args.seed)
-        seed(args.seed)
 
     model = Autoencoder()
     load_model(args, model)
@@ -38,26 +34,33 @@ def test(args):
 
     test_loader = get_loaders(args)
 
-    losses = test_batches(model, device, criterion, test_loader)
+    losses = test_batches(args, model, device, criterion, test_loader)
+
     test_log(losses)
 
 
-def save_images(x, y_true, y_pred):
-    """Save the images for visual examination."""
-    print(x.shape, y_true.shape, y_pred.shape)
-
-
-def test_batches(model, device, criterion, loader):
+def test_batches(args, model, device, criterion, loader):
     """Run the validating phase of the epoch."""
+    losses = []
     model.eval()
     for data in tqdm(loader):
-        x, y_true, *_ = data
+        x, y_true, width, height, name = data
         x, y_true = x.to(device), y_true.to(device)
         with torch.set_grad_enabled(False):
             y_pred = model(x)
             batch_loss = criterion(y_pred, y_true)
-        save_images(x, y_true, y_pred)
-    return batch_loss
+            losses.append(batch_loss.item())
+        save_predictions(args, y_pred, name)
+    return losses
+
+
+def save_predictions(args, y_pred, name):
+    """Save predictions for analysis"""
+    if args.prediction_dir:
+        for i, pred in enumerate(y_pred):
+            path = join(args.prediction_dir, name[i])
+            image = ToPILImage()(pred)
+            image.save(path)
 
 
 def test_log(losses):
@@ -68,7 +71,8 @@ def test_log(losses):
 
 def get_loaders(args):
     """Get the data loaders."""
-    test_split = ImageFileDataset.split_files(args.dirty_dir, args.clean_dir)
+    test_split, *_ = ImageFileDataset.split_files(
+        args.dirty_dir, args.clean_dir, args.test_split)
 
     test_dataset = ImageFileDataset(test_split, resize=(512, 512))
 
@@ -111,7 +115,11 @@ def parse_args():
         '--dirty-dir', '-D', help="""Read dirty images from this directory.""")
 
     arg_parser.add_argument(
-        '--model-dir', '-M', help="""Save best models to this directory.""")
+        '--prediction-dir', '-R', help="""Save model predictions here.""")
+
+    arg_parser.add_argument(
+        '--load-model', '-L', required=True,
+        help="""Load this state dict to restart the model.""")
 
     arg_parser.add_argument(
         '--device', '-d',
@@ -127,16 +135,7 @@ def parse_args():
         '--workers', '-w', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
 
-    arg_parser.add_argument(
-        '--load-model', '-L', help="""Load this state dict to restart the model.""")
-
-    arg_parser.add_argument(
-        '--seed', '-S', type=int, help="""Create a random seed.""")
-
     args = arg_parser.parse_args()
-
-    if args.model_dir:
-        args.model_dir = Path(args.model_dir)
 
     if not args.device:
         args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'

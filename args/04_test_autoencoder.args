@@ -1,1 +1,6 @@
-
+--clean-dir=./data/test/clean
+--dirty-dir=./data/test/dirty
+--prediction-dir=./data/test/result
+--load-model=./data/models/best_50.pth
+--test-split=128
+--batch-size=4

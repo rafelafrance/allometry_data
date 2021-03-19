@@ -33,8 +33,8 @@ class ImageFileDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
 
-        dirty = Image.open(image['dirty']).convert('F')
-        clean = Image.open(image['clean']).convert('F')
+        dirty = Image.open(image['dirty'])
+        clean = Image.open(image['clean'])
 
         if self.resize:
             dirty = dirty.resize(self.resize)
@@ -48,7 +48,7 @@ class ImageFileDataset(Dataset):
         clean /= 255.0
         clean = clean[np.newaxis, :, :]
 
-        return dirty, clean, image['shape'], image['name']
+        return dirty, clean, image['shape'][0], image['shape'][1], image['name']
 
     @staticmethod
     def split_files(dirty_dir, clean_dir, *segments, glob='*.jpg', count=None):
@@ -60,11 +60,12 @@ class ImageFileDataset(Dataset):
         count = count if count else len(names)
         names = sample(names, count)
 
-        splits = []
+        splits = [list([]) for _ in segments]
+
         start, end = 0, 0
-        for seg in segments:
+        for s, seg in enumerate(segments):
             end = int(start + seg if seg > 1.0 else start + round(count * seg))
-            splits.append([(dirty[n], clean[n]) for n in names[start:end]])
+            splits[s] = [(dirty[n], clean[n]) for n in names[start:end]]
             start = end
 
         if end < count:
