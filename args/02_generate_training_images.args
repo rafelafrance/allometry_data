@@ -1,4 +1,3 @@
---text-dir=./data/text
 --clean-dir=./data/train/clean
 --dirty-dir=./data/train/dirty
---count=1024
+--count=256

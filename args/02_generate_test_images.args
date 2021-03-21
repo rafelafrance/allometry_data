@@ -1,4 +1,5 @@
 --text-dir=./data/text
 --clean-dir=./data/test/clean
 --dirty-dir=./data/test/dirty
---count=128
+--count=256
+--seed=7793

@@ -1,5 +1,5 @@
 """Common functions for generating allometry images from text."""
-from random import choice, randint, random, randrange
+from random import choice, randint
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -16,21 +16,13 @@ def clean_image(data, font, font_size, width, height):
 
     x, y = translate_text_params(size, width, height)
 
-    txt = rotate_text(font, size, text)
+    txt = Image.new('L', size=size, color='white')
+    draw = ImageDraw.Draw(txt)
+    draw.text((0, 0), text, font=font, fill='black')
 
     image.paste(txt, (x, y))
 
     return image
-
-
-def rotate_text(font, size, text):
-    """Rotate the text."""
-    txt = Image.new('L', size=size, color='white')
-    draw = ImageDraw.Draw(txt)
-    draw.text((0, 0), text, font=font, fill='black')
-    theta = randrange(0, 2, 1) if random() < 0.5 else randrange(358, 360, 1)
-    txt = txt.rotate(theta, expand=True, fillcolor='white')
-    return txt
 
 
 def translate_text_params(size, width, height):

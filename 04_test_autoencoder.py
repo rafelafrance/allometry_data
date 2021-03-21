@@ -74,7 +74,7 @@ def get_loaders(args):
     test_split, *_ = ImageFileDataset.split_files(
         args.dirty_dir, args.clean_dir, args.test_split)
 
-    test_dataset = ImageFileDataset(test_split, resize=(512, 512))
+    test_dataset = ImageFileDataset(test_split)
 
     test_loader = DataLoader(
         test_dataset,

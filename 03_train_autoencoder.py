@@ -10,14 +10,13 @@ from random import seed
 import numpy as np
 import torch
 import torch.optim as optim
-from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
-# from allometry.metrics import BinaryDiceLoss
+from allometry.metrics import BinaryDiceLoss
 from allometry.util import finished, started
 
 
@@ -37,8 +36,7 @@ def train(args):
     device = torch.device(args.device)
     model.to(device)
 
-    # criterion = BinaryDiceLoss()
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = BinaryDiceLoss()
 
     losses = []
     train_loader, valid_loader = get_loaders(args)
@@ -125,8 +123,8 @@ def get_loaders(args):
     train_split, valid_split = ImageFileDataset.split_files(
         args.dirty_dir, args.clean_dir, args.train_split, args.valid_split)
 
-    train_dataset = ImageFileDataset(train_split, resize=(512, 512))
-    valid_dataset = ImageFileDataset(valid_split, resize=(512, 512))
+    train_dataset = ImageFileDataset(train_split, size=(512, 512), seed=args.seed)
+    valid_dataset = ImageFileDataset(valid_split, size=(512, 512), seed=args.seed)
 
     train_loader = DataLoader(
         train_dataset,
