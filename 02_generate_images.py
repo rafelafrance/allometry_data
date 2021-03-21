@@ -29,19 +29,19 @@ def build_page(args, page):
     font, font_size, image_filter, snow_fract = choose_font()
 
     clean = clean_image(data, font, font_size, WIDTH, HEIGHT)
-    if args.clean_dir:
-        clean.save(args.clean_dir / name, 'JPEG')
+    if args.y_dir:
+        clean.save(args.y_dir / name, 'JPEG')
 
     dirty = dirty_image(clean, snow_fract, image_filter)
-    if args.dirty_dir:
-        dirty.save(args.dirty_dir / name, 'JPEG')
+    if args.x_dir:
+        dirty.save(args.x_dir / name, 'JPEG')
 
     return data
 
 
 def generate_images(args):
     """Generate the images for the pages."""
-    existing = {p.stem for p in args.clean_dir.glob('*.jpg')}
+    existing = {p.stem for p in args.y_dir.glob('*.jpg')}
     existing = set() if args.remove_images else existing
 
     pages = [p for p in args.text_dir.glob('*.json') if p.stem not in existing]
@@ -51,11 +51,11 @@ def generate_images(args):
         pages = pages[:args.count]
 
     if args.remove_images:
-        if args.clean_dir:
-            for path in args.clean_dir.glob('*.jpg'):
+        if args.y_dir:
+            for path in args.y_dir.glob('*.jpg'):
                 path.unlink()
-        if args.dirty_dir:
-            for path in args.dirty_dir.glob('*.jpg'):
+        if args.x_dir:
+            for path in args.x_dir.glob('*.jpg'):
                 path.unlink()
 
     for page in tqdm(pages):
@@ -79,10 +79,10 @@ def parse_args():
             all of the files in the --text-dir.""")
 
     arg_parser.add_argument(
-        '--clean-dir', '-C', help="""Save the clean images to this directory.""")
+        '--x-dir', '-X', help="""Save the dirty images to this directory.""")
 
     arg_parser.add_argument(
-        '--dirty-dir', '-D', help="""Save the dirty images to this directory.""")
+        '--y-dir', '-Y', help="""Save the clean images to this directory.""")
 
     arg_parser.add_argument(
         '--remove-images', '-R', action='store_true',
@@ -97,10 +97,10 @@ def parse_args():
     args = arg_parser.parse_args()
     if args.text_dir:
         args.text_dir = Path(args.text_dir)
-    if args.clean_dir:
-        args.clean_dir = Path(args.clean_dir)
-    if args.dirty_dir:
-        args.dirty_dir = Path(args.dirty_dir)
+    if args.y_dir:
+        args.y_dir = Path(args.y_dir)
+    if args.x_dir:
+        args.x_dir = Path(args.x_dir)
 
     return args
 

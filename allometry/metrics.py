@@ -3,8 +3,6 @@
 import torch
 from torch import nn
 
-THRESH = 0.96
-
 
 class BinaryDiceLoss(nn.Module):
     """Calculate the dice loss function for binary classification."""
@@ -13,13 +11,12 @@ class BinaryDiceLoss(nn.Module):
         super().__init__()
         self.eps = eps
 
-    def forward(self, y_pred, y_true):
+    def forward(self, pred, y):
         """Calculate the dice loss function for binary arrays."""
-        y_pred = torch.sigmoid(y_pred)
+        pred = torch.flatten(pred)
+        y = torch.flatten(y)
 
-        y_pred = torch.flatten(y_pred)
-        y_true = torch.flatten(y_true)
+        inter = (pred * y).sum()
 
-        inter = (y_pred * y_true).sum()
-        score = (2.0 * inter + self.eps) / (y_pred.sum() + y_true.sum() + self.eps)
+        score = (2.0 * inter + self.eps) / (pred.sum() + y.sum() + self.eps)
         return 1.0 - score

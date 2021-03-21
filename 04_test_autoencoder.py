@@ -5,17 +5,17 @@ import argparse
 import logging
 import textwrap
 from os.path import join
+from random import seed
 
 import numpy as np
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
-from torchvision.transforms import ToPILImage
+from torchvision.utils import save_image
 from tqdm import tqdm
 
-# from allometry.metrics import BinaryDiceLoss
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
+from allometry.metrics import BinaryDiceLoss
 from allometry.util import finished, started
 
 
@@ -23,14 +23,17 @@ def test(args):
     """Train the neural net."""
     logging.info('Starting testing')
 
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        seed(args.seed)
+
     model = Autoencoder()
     load_model(args, model)
 
     device = torch.device(args.device)
     model.to(device)
 
-    # criterion = BinaryDiceLoss()
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = BinaryDiceLoss()
 
     test_loader = get_loaders(args)
 
@@ -44,23 +47,28 @@ def test_batches(args, model, device, criterion, loader):
     losses = []
     model.eval()
     for data in tqdm(loader):
-        x, y_true, width, height, name = data
-        x, y_true = x.to(device), y_true.to(device)
+        x, y, name = data
+        x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
-            y_pred = model(x)
-            batch_loss = criterion(y_pred, y_true)
+            pred = model(x)
+            batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
-        save_predictions(args, y_pred, name)
+        save_predictions(args, x, y, pred, name)
     return losses
 
 
-def save_predictions(args, y_pred, name):
+def save_predictions(args, x, y, pred, name):
     """Save predictions for analysis"""
     if args.prediction_dir:
-        for i, pred in enumerate(y_pred):
-            path = join(args.prediction_dir, name[i])
-            image = ToPILImage()(pred)
-            image.save(path)
+        for x, y, pred, name in zip(x, y, pred, name):
+            path = join(args.prediction_dir, 'clean', name)
+            save_image(x, path)
+
+            path = join(args.prediction_dir, 'dirty', name)
+            save_image(y, path)
+
+            path = join(args.prediction_dir, 'prediction', name)
+            save_image(pred, path)
 
 
 def test_log(losses):
@@ -72,15 +80,13 @@ def test_log(losses):
 def get_loaders(args):
     """Get the data loaders."""
     test_split, *_ = ImageFileDataset.split_files(
-        args.dirty_dir, args.clean_dir, args.test_split)
+        args.x_dir, args.y_dir, args.test_split)
 
-    test_dataset = ImageFileDataset(test_split)
+    test_dataset = ImageFileDataset(test_split, size=(512, 512))
 
     test_loader = DataLoader(
         test_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
         num_workers=args.workers,
     )
 
@@ -103,19 +109,17 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--test-split', '-t', type=float, required=True,
-        help="""How many records to use for testing. If the argument is
-            greater than 1 than it's treated as a count. If 1 or less then it
-            is treated as a fraction.""")
+        '--test-split', '-t', type=int, required=True,
+        help="""How many records to use for testing.""")
 
     arg_parser.add_argument(
-        '--clean-dir', '-C', help="""Read clean images from this directory.""")
+        '--x-dir', '-X', help="""Read dirty images from this directory.""")
 
     arg_parser.add_argument(
-        '--dirty-dir', '-D', help="""Read dirty images from this directory.""")
+        '--y-dir', '-Y', help="""Read clean images from this directory.""")
 
     arg_parser.add_argument(
-        '--prediction-dir', '-R', help="""Save model predictions here.""")
+        '--prediction-dir', '-P', help="""Save model predictions here.""")
 
     arg_parser.add_argument(
         '--load-model', '-L', required=True,
@@ -134,6 +138,9 @@ def parse_args():
     arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--seed', '-S', type=int, help="""Create a random seed.""")
 
     args = arg_parser.parse_args()
 

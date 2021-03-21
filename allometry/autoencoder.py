@@ -21,10 +21,11 @@ class Autoencoder(nn.Module):
         self.dec2 = self.decoder(features * 4, features * 2)
         self.dec1 = self.decoder(features * 2, features)
 
-        self.end = nn.Conv2d(
+        self.last = nn.Conv2d(
             in_channels=features,
             out_channels=out_channels,
             kernel_size=(1, 1))
+        self.end = nn.Sigmoid()
 
     def encoder(self, in_channels, out_channels):
         """Build an encoder segment."""
@@ -65,5 +66,6 @@ class Autoencoder(nn.Module):
         x = self.dec3(x)
         x = self.dec2(x)
         x = self.dec1(x)
+        x = self.last(x)
         x = self.end(x)
         return x

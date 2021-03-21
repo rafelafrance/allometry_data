@@ -4,6 +4,7 @@
 import argparse
 import logging
 import textwrap
+from os.path import join
 from pathlib import Path
 from random import seed
 
@@ -12,6 +13,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torchvision.utils import save_image
 from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
@@ -25,13 +27,14 @@ def train(args):
     logging.info('Starting training')
 
     if args.seed is not None:
-        torch.cuda.manual_seed(args.seed)
+        torch.manual_seed(args.seed)
         seed(args.seed)
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(args.runs_dir)
 
-    model = Autoencoder()
-    load_model(args, model)
+    model = get_model(args)
+    epoch_start = load_state(args, model)
+    epoch_end = epoch_start + args.epochs + 1
 
     device = torch.device(args.device)
     model.to(device)
@@ -41,20 +44,18 @@ def train(args):
     losses = []
     train_loader, valid_loader = get_loaders(args)
 
-    best_valid = 9999.0
-
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(epoch_start, epoch_end):
         train_batches(model, device, criterion, losses, train_loader, optimizer)
         msg = train_log(writer, losses, epoch)
         losses = []
 
-        valid_batches(model, device, criterion, losses, valid_loader)
-        curr_valid = valid_log(writer, losses, epoch, msg)
+        valid_batches(args, model, device, criterion, losses, valid_loader, epoch)
+        valid_log(writer, losses, epoch, msg)
         losses = []
 
-        save_model(args, model, epoch, best_valid, curr_valid)
+        save_state(args, model, epoch)
 
     writer.flush()
     writer.close()
@@ -64,27 +65,42 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
     """Run the training phase of the epoch."""
     model.train()
     for data in tqdm(loader):
-        x, y_true, *_ = data
-        x, y_true = x.to(device), y_true.to(device)
+        x, y, *_ = data
+        x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
         with torch.set_grad_enabled(True):
-            y_pred = model(x)
-            batch_loss = criterion(y_pred, y_true)
+            pred = model(x)
+            batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
             batch_loss.backward()
             optimizer.step()
 
 
-def valid_batches(model, device, criterion, losses, loader):
+def valid_batches(args, model, device, criterion, losses, loader, epoch):
     """Run the validating phase of the epoch."""
     model.eval()
     for data in tqdm(loader):
-        x, y_true, *_ = data
-        x, y_true = x.to(device), y_true.to(device)
+        x, y, name = data
+        x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
-            y_pred = model(x)
-            batch_loss = criterion(y_pred, y_true)
+            pred = model(x)
+            batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
+        save_predictions(args, x, y, pred, name, epoch)
+
+
+def save_predictions(args, x, y, pred, name, epoch):
+    """Save predictions for analysis"""
+    if args.prediction_dir:
+        for x_, y_, pred_, name_ in zip(x, y, pred, name):
+            path = join(args.prediction_dir, 'x', f'{epoch}_{name_}')
+            save_image(x_, path)
+
+            path = join(args.prediction_dir, 'y', f'{epoch}_{name_}')
+            save_image(y_, path)
+
+            path = join(args.prediction_dir, 'pred', f'{epoch}_{name_}')
+            save_image(pred_, path)
 
 
 def train_log(writer, losses, epoch):
@@ -99,32 +115,57 @@ def valid_log(writer, losses, epoch, msg):
     avg_loss = np.mean(losses)
     writer.add_scalar("Loss/valid", avg_loss, epoch)
     logging.info(f'Epoch: {epoch: 3d} Average losses {msg} validation {avg_loss:0.6f}')
-    return avg_loss
 
 
-def save_model(args, model, epoch, best_valid, curr_valid):
+def get_model(args):
+    """Get the model to use."""
+    if args.model == 'unet':
+        model = torch.hub.load(
+            'mateuszbuda/brain-segmentation-pytorch',
+            'unet',
+            in_channels=1,
+            out_channels=1,
+            init_features=32,
+            pretrained=False)
+
+    elif args.model == 'deeplabv3':
+        model = torch.hub.load(
+            'pytorch/vision:v0.9.0',
+            'deeplabv3_resnet101',
+            pretrained=False)
+
+    else:
+        model = Autoencoder()
+
+    return model
+
+
+def save_state(args, model, epoch):
     """Save the model if the current validation score is better than the best one."""
     # TODO save optimizer too
-    if curr_valid < best_valid and epoch % args.save_every == 0:
-        path = args.model_dir / f'best_autoencoder{epoch}.pth'
+    if epoch % args.save_every == 0:
+        path = args.state_dir / f'best_autoencoder{epoch}.pth'
         model.state_dict()['epoch'] = epoch
         torch.save(model.state_dict(), path)
 
 
-def load_model(args, model):
+def load_state(args, model):
     """Load a saved model."""
-    if args.load_model:
-        state = torch.load(args.load_model)
+    start = 1
+    if args.load_state:
+        state = torch.load(args.load_state)
         model.load_state_dict(state)
+        start = model.state_dict()['epoch'] + 1
+    return start
 
 
 def get_loaders(args):
     """Get the data loaders."""
     train_split, valid_split = ImageFileDataset.split_files(
-        args.dirty_dir, args.clean_dir, args.train_split, args.valid_split)
+        args.x_dir, args.y_dir, args.train_split, args.valid_split)
 
-    train_dataset = ImageFileDataset(train_split, size=(512, 512), seed=args.seed)
-    valid_dataset = ImageFileDataset(valid_split, size=(512, 512), seed=args.seed)
+    train_dataset = ImageFileDataset(train_split, size=(512, 512))
+    valid_dataset = ImageFileDataset(valid_split, size=(512, 512))
 
     train_loader = DataLoader(
         train_dataset,
@@ -154,31 +195,41 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--train-split', '-t', type=float, required=True,
-        help="""How many records to use for training. If the argument is
-            greater than 1 than it's treated as a count. If 1 or less then it
-            is treated as a fraction.""")
+        '--train-split', '-t', type=int, required=True,
+        help="""How many records to use for training.""")
 
     arg_parser.add_argument(
-        '--valid-split', '-v', type=float, required=True,
-        help="""How many records to use for validation. If the argument is
-            greater than 1 than it's treated as a count. If 1 or less then it
-            is treated as a fraction.""")
+        '--x-dir', '-X', required=True,
+        help="""Read dirty images from this directory.""")
 
     arg_parser.add_argument(
-        '--clean-dir', '-C', help="""Read clean images from this directory.""")
+        '--y-dir', '-Y', required=True,
+        help="""Read clean images from this directory.""")
 
     arg_parser.add_argument(
-        '--dirty-dir', '-D', help="""Read dirty images from this directory.""")
+        '--valid-split', '-V', type=int, required=True,
+        help="""How many records to use for validation.""")
 
     arg_parser.add_argument(
-        '--model-dir', '-M', help="""Save best models to this directory.""")
+        '--state-dir', '-s', help="""Save best models to this directory.""")
+
+    arg_parser.add_argument(
+        '--runs-dir', '-R', help="""Save tensor board logs to this directory.""")
+
+    arg_parser.add_argument(
+        '--prediction-dir', '-P', help="""Save model predictions here.""")
 
     arg_parser.add_argument(
         '--device', '-d',
         help="""Which GPU or CPU to use. Options are 'cpu', 'cuda:0', 'cuda:1' etc.
             We'll try to default to either 'cpu' or 'cuda:0' depending on the
             availability of a GPU.""")
+
+    arg_parser.add_argument(
+        '--model', '-m', choices=['autoencoder', 'unet', 'deeplabv3'],
+        default='autoencoder',
+        help="""What model architecture to use. (default: %(default)s)
+            U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
 
     arg_parser.add_argument(
         '--epochs', '-e', type=int, default=100,
@@ -203,15 +254,16 @@ def parse_args():
         help="""Number of workers for loading data. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--load-model', '-L', help="""Load this state dict to restart the model.""")
+        '--load-state', '-L',
+        help="""Load this state dict to restart the model.""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int, help="""Create a random seed.""")
 
     args = arg_parser.parse_args()
 
-    if args.model_dir:
-        args.model_dir = Path(args.model_dir)
+    if args.state_dir:
+        args.state_dir = Path(args.state_dir)
 
     if not args.device:
         args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'

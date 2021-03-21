@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 from random import random, randrange, sample
 
+import numpy as np
 import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
@@ -11,19 +12,21 @@ from torchvision.transforms import RandomCrop
 
 
 class ImageFileDataset(Dataset):
-    """Get data from image files stored in 'clean' and 'dirty' directories."""
+    """Get data from image files stored in 'x_dir' and 'y_dir' directories."""
 
-    def __init__(self, image_pairs, *, size=None, seed=None):
+    def __init__(self, image_pairs, *, size=None):
         """Generate a dataset using pairs of images.
 
         The pairs are in tuples of (dirty_image, clean_image).
         """
         self.images = []
         self.size = size
-        self.seed = seed
 
-        for dirty, clean in image_pairs:
-            self.images.append((dirty, clean, dirty.name))
+        # Make sure there are some pixels in the randomly cropped image
+        self.threshold = (size[0] + size[1]) * 255
+
+        for x, y in image_pairs:
+            self.images.append((x, y, x.name))
 
     def __len__(self):
         return len(self.images)
@@ -31,95 +34,93 @@ class ImageFileDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
 
-        dirty = Image.open(image[0])
-        # dirty = np.asarray(dirty).copy()
-        # dirty /= 255.0
-        # dirty = Image.fromarray(dirty)
+        x = Image.open(image[0])
+        y = Image.open(image[1])
 
-        clean = Image.open(image[1])
-        # clean = np.asarray(clean).copy()
-        # clean /= 255.0
-        # clean = Image.fromarray(clean)
+        x, y = self._crop(x, y)
+        x, y = self._rotate(x, y)
+        x, y = self._h_flip(x, y)
+        x, y = self._v_flip(x, y)
 
-        dirty, clean = self._crop(dirty, clean)
-        # dirty, clean = self._rotate(dirty, clean)
-        # dirty, clean = self._h_flip(dirty, clean)
-        # dirty, clean = self._v_flip(clean, dirty)
+        x = self._brightness(x)
+        x = self._contrast(x)
+        x = self._equalize(x)
 
-        # dirty = self._brightness(dirty)
-        # dirty = self._contrast(dirty)
-        # dirty = self._equalize(dirty)
+        x = TF.to_tensor(x)
+        y = TF.to_tensor(y)
 
-        dirty = TF.to_tensor(dirty)
-        clean = TF.to_tensor(clean)
+        return x, y, image[2]
 
-        return dirty, clean, image[2]
+    def _crop(self, x, y):
+        i, j, h, w = 0, 0, 0, 0  # Linter silliness
 
-    def _crop(self, dirty, clean):
-        i, j, h, w = RandomCrop.get_params(dirty, output_size=self.size)
-        dirty = TF.crop(dirty, i, j, h, w)
-        clean = TF.crop(clean, i, j, h, w)
-        return clean, dirty
+        for _ in range(5):
+            i, j, h, w = RandomCrop.get_params(y, output_size=self.size)
+            y = TF.crop(y, i, j, h, w)
+
+            if np.array(y).flatten().sum() > self.threshold:
+                break
+
+        x = TF.crop(x, i, j, h, w)
+        return x, y
 
     @staticmethod
-    def _equalize(dirty):
+    def _equalize(x):
         if random() < 0.05:
-            dirty = TF.equalize(dirty)
-        return dirty
+            x = TF.equalize(x)
+        return x
 
     @staticmethod
-    def _contrast(dirty):
+    def _contrast(x):
         if random() < 0.05:
-            dirty = TF.adjust_contrast(dirty, 2.0)
-        return dirty
+            x = TF.adjust_contrast(x, 2.0)
+        return x
 
     @staticmethod
-    def _brightness(dirty):
+    def _brightness(x):
         if random() < 0.05:
-            dirty = TF.adjust_brightness(dirty, 2.0)
-        return dirty
+            x = TF.adjust_brightness(x, 2.0)
+        return x
 
     @staticmethod
-    def _v_flip(dirty, clean):
-        if random() > 0.05:
-            dirty = TF.vflip(dirty)
-            clean = TF.vflip(clean)
-        return dirty, clean
+    def _v_flip(x, y):
+        if random() < 0.05:
+            x = TF.vflip(x)
+            y = TF.vflip(y)
+        return x, y
 
     @staticmethod
-    def _h_flip(dirty, clean):
-        if random() > 0.05:
-            dirty = TF.hflip(dirty)
-            clean = TF.hflip(clean)
-        return clean, dirty
+    def _h_flip(x, y):
+        if random() < 0.05:
+            x = TF.hflip(x)
+            y = TF.hflip(y)
+        return x, y
 
     @staticmethod
-    def _rotate(dirty, clean):
-        if random() > 0.1:
+    def _rotate(x, y):
+        if random() < 0.1:
             theta = randrange(0, 2, 1) if random() < 0.5 else randrange(358, 360, 1)
-            dirty = TF.rotate(dirty, theta)
-            clean = TF.rotate(clean, theta)
-        return clean, dirty
+            x = TF.rotate(x, theta)
+            y = TF.rotate(y, theta)
+        return x, y
 
     @staticmethod
-    def split_files(dirty_dir, clean_dir, *segments, glob='*.jpg', count=None):
+    def split_files(x_dir, y_dir, *segments, glob='*.jpg'):
         """Split contents of a dir into datasets."""
-        clean = {p.name: p for x in Path(clean_dir).glob(glob) if (p := Path(x))}
-        dirty = {p.name: p for x in Path(dirty_dir).glob(glob) if (p := Path(x))}
+        ys = {p.name: p for x in Path(y_dir).glob(glob) if (p := Path(x))}
+        xs = {p.name: p for x in Path(x_dir).glob(glob) if (p := Path(x))}
 
-        names = set(dirty.keys()) & set(clean.keys())
-        count = count if count else len(names)
+        count = sum(segments)
+
+        names = set(xs.keys()) & set(ys.keys())
         names = sample(names, count)
 
         splits = [list([]) for _ in segments]
 
         start, end = 0, 0
         for s, seg in enumerate(segments):
-            end = int(start + seg if seg > 1.0 else start + round(count * seg))
-            splits[s] = [(dirty[n], clean[n]) for n in names[start:end]]
+            end = start + seg
+            splits[s] = [(xs[n], ys[n]) for n in names[start:end]]
             start = end
-
-        if end < count:
-            splits[0].extend(names[end:count])
 
         return tuple(splits)

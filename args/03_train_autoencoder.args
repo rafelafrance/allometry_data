@@ -1,8 +1,10 @@
---clean-dir=./data/train/clean
---dirty-dir=./data/train/dirty
---model-dir=./data/models
+--x-dir=./data/train/x
+--y-dir=./data/train/y
+--state-dir=./data/state
+--runs-dir=./data/runs
 --train-split=768
 --valid-split=256
---epochs=100
+--epochs=2
 --save-every=10
 --batch-size=4
+--seed=764

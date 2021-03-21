@@ -1,6 +1,7 @@
---clean-dir=./data/test/clean
---dirty-dir=./data/test/dirty
---prediction-dir=./data/test/result
---load-model=./data/models/best_50.pth
---test-split=128
+--x-dir=./data/test/x
+--y-dir=./data/test/y
+--prediction-dir=./data/test/pred
+--load-model=./data/state/best_autoencoder100.pth
+--test-split=256
 --batch-size=4
+--seed=23

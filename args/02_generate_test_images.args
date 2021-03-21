@@ -1,5 +1,5 @@
 --text-dir=./data/text
---clean-dir=./data/test/clean
---dirty-dir=./data/test/dirty
+--x-dir=./data/test/x
+--y-dir=./data/test/y
 --count=256
 --seed=7793
