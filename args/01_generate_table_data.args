@@ -1,2 +1,2 @@
---text-dir=./data/text
+--text-dir=./data/page
 --count=10000

@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from tqdm import tqdm
+# from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
@@ -46,7 +46,7 @@ def test_batches(args, model, device, criterion, loader):
     """Run the validating phase of the epoch."""
     losses = []
     model.eval()
-    for data in tqdm(loader):
+    for data in loader:
         x, y, name = data
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):

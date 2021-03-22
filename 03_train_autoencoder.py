@@ -14,7 +14,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
-from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
@@ -54,7 +53,7 @@ def train(args):
         losses = []
 
         valid_batches(args, model, device, criterion, losses, valid_loader, epoch)
-        avg_loss = valid_log(writer, losses, epoch, msg)
+        avg_loss = valid_log(writer, losses, epoch, msg, best_loss)
         losses = []
 
         best_loss = save_state(args, model, epoch, best_loss, avg_loss)
@@ -66,7 +65,7 @@ def train(args):
 def train_batches(model, device, criterion, losses, loader, optimizer):
     """Run the training phase of the epoch."""
     model.train()
-    for data in tqdm(loader):
+    for data in loader:
         x, y, *_ = data
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
@@ -81,7 +80,7 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
 def valid_batches(args, model, device, criterion, losses, loader, epoch):
     """Run the validating phase of the epoch."""
     model.eval()
-    for data in tqdm(loader):
+    for data in loader:
         x, y, name = data
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
@@ -112,11 +111,13 @@ def train_log(writer, losses, epoch):
     return f'training {avg_loss:0.6f}'
 
 
-def valid_log(writer, losses, epoch, msg):
+def valid_log(writer, losses, epoch, msg, best_loss):
     """Clean up after the validation epoch."""
     avg_loss = np.mean(losses)
+    flag = '*' if avg_loss < best_loss else ''
     writer.add_scalar("Loss/valid", avg_loss, epoch)
-    logging.info(f'Epoch: {epoch: 3d} Average losses {msg} validation {avg_loss:0.6f}')
+    logging.info(
+        f'Epoch: {epoch: 3d} Average loss {msg} validation {avg_loss:0.6f} {flag}')
     return avg_loss
 
 
@@ -257,10 +258,9 @@ def parse_args():
         help="""Input batch size. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--save-every', '-i', type=int, default=10,
+        '--save-every', '-i', type=int,
         help="""Check every -i iterations to see if we should save a snapshot of the
-            model. It only saves if the validation loss is less than the previous
-            best validation loss. (default: %(default)s)""")
+            model. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--width', '-W', type=int, default=512,

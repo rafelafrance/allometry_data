@@ -2,12 +2,15 @@
 
 from os.path import basename, splitext
 from pathlib import Path
-from random import choice
+from random import choice, random
 
 FONTS_DIR = Path('.') / 'fonts'
 
 FONTS = FONTS_DIR.glob('*/*.ttf')
 FONTS = sorted([str(f) for f in FONTS])
+
+BOLD = [f for f in FONTS if f.casefold().find('bold') > -1]
+REGULAR = [f for f in FONTS if f not in BOLD]
 
 FONT_PARAMS = {
     'B612Mono-Bold': {},
@@ -34,9 +37,10 @@ FONT_PARAMS = {
 
 def choose_font():
     """Randomly select a font to use for the image."""
-    font = choice(FONTS)
+    font = choice(BOLD) if random() < 0.5 else choice(REGULAR)
+    is_bold = font.casefold().find('bold') > -1
+
     name = splitext(basename(font))[0]
-    is_bold = name.lower().find('bold') > -1
 
     params = FONT_PARAMS.get(name, {})
 

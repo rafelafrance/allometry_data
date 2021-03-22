@@ -1,9 +1,10 @@
 --x-dir=./data/test/x
 --y-dir=./data/test/y
---prediction-dir=./data/test/result
---state=./data/state/best_autoencoder.pth
+--prediction-dir=./data/result
+--state=./data/state/best_unet.pth
 --test-split=256
 --batch-size=4
 --seed=23
 --width=768
 --height=512
+--model=unet

@@ -1,4 +1,4 @@
---text-dir=./data/text
+--text-dir=./data/page
 --x-dir=./data/test/x
 --y-dir=./data/test/y
 --count=256

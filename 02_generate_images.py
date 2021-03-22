@@ -10,7 +10,7 @@ from random import seed
 from tqdm import tqdm
 
 from allometry.font_util import choose_font
-from allometry.page_image import y_image, x_image
+from allometry.page_image import x_image, y_image
 
 WIDTH = 4500
 HEIGHT = 3440

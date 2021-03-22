@@ -2,10 +2,11 @@
 --y-dir=./data/train/y
 --state-dir=./data/state
 --runs-dir=./data/runs
---train-split=768
---valid-split=256
+--train-split=1536
+--valid-split=512
 --epochs=100
 --batch-size=4
 --seed=364
 --width=768
 --height=512
+--model=unet
