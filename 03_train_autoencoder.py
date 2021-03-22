@@ -150,12 +150,12 @@ def save_state(args, model, epoch, best_loss, avg_loss):
     model.state_dict()['epoch'] = epoch
     model.state_dict()['avg_loss'] = avg_loss
 
-    if epoch % args.save_every == 0:
+    if args.save_every and epoch % args.save_every == 0:
         path = args.state_dir / f'save_{args.model}_{epoch}.pth'
         torch.save(model.state_dict(), path)
 
-    if avg_loss < best_loss:
-        path = args.state_dir / f'best_{args.model}_{epoch}.pth'
+    if args.save_best and avg_loss < best_loss:
+        path = args.state_dir / f'best_{args.model}.pth'
         torch.save(model.state_dict(), path)
         best_loss = avg_loss
 
@@ -177,7 +177,7 @@ def get_loaders(args):
     train_split, valid_split = ImageFileDataset.split_files(
         args.x_dir, args.y_dir, args.train_split, args.valid_split)
 
-    size = (args.width, args.height)
+    size = (args.height, args.width)
 
     train_dataset = ImageFileDataset(train_split, size=size)
     valid_dataset = ImageFileDataset(valid_split, size=size)
@@ -277,6 +277,10 @@ def parse_args():
     arg_parser.add_argument(
         '--load-state', '-L',
         help="""Load this state dict to restart the model.""")
+
+    arg_parser.add_argument(
+        '--no-save-best', '-B', action='store_false', dest='save_best',
+        help="""Save the model with the best validation score.""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int, help="""Create a random seed.""")

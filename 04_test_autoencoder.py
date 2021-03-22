@@ -82,7 +82,7 @@ def get_loaders(args):
     test_split, *_ = ImageFileDataset.split_files(
         args.x_dir, args.y_dir, args.test_split)
 
-    size = (args.width, args.height)
+    size = (args.height, args.width)
 
     test_dataset = ImageFileDataset(test_split, size=size)
 

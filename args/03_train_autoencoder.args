@@ -5,8 +5,7 @@
 --train-split=768
 --valid-split=256
 --epochs=100
---save-every=10
 --batch-size=4
---seed=764
+--seed=364
 --width=768
 --height=512
