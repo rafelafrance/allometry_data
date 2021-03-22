@@ -10,7 +10,7 @@ from random import seed
 from tqdm import tqdm
 
 from allometry.font_util import choose_font
-from allometry.page_image import clean_image, dirty_image
+from allometry.page_image import y_image, x_image
 
 WIDTH = 4500
 HEIGHT = 3440
@@ -28,13 +28,13 @@ def build_page(args, page):
 
     font, font_size, image_filter, snow_fract = choose_font()
 
-    clean = clean_image(data, font, font_size, WIDTH, HEIGHT)
+    y = y_image(data, font, font_size, WIDTH, HEIGHT)
     if args.y_dir:
-        clean.save(args.y_dir / name, 'JPEG')
+        y.save(args.y_dir / name, 'JPEG')
 
-    dirty = dirty_image(clean, snow_fract, image_filter)
+    x = x_image(y, snow_fract, image_filter)
     if args.x_dir:
-        dirty.save(args.x_dir / name, 'JPEG')
+        x.save(args.x_dir / name, 'JPEG')
 
     return data
 
@@ -79,15 +79,15 @@ def parse_args():
             all of the files in the --text-dir.""")
 
     arg_parser.add_argument(
-        '--x-dir', '-X', help="""Save the dirty images to this directory.""")
+        '--x-dir', '-X', help="""Save the x images to this directory.""")
 
     arg_parser.add_argument(
-        '--y-dir', '-Y', help="""Save the clean images to this directory.""")
+        '--y-dir', '-Y', help="""Save the y images to this directory.""")
 
     arg_parser.add_argument(
         '--remove-images', '-R', action='store_true',
-        help="""Should we clear all of the existing images in the clean &
-            dirty directories.""")
+        help="""Should we clear all of the existing images in the --x-dir &
+            --y-dir.""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int,

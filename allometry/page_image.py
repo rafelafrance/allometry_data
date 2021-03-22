@@ -5,8 +5,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
-def clean_image(data, font, font_size, width, height):
-    """Generate a clean image from the text."""
+def y_image(data, font, font_size, width, height):
+    """Generate a target image from the text."""
     text = data['page']
 
     font = ImageFont.truetype(font=font, size=font_size)
@@ -14,24 +14,24 @@ def clean_image(data, font, font_size, width, height):
 
     image = Image.new(mode='L', size=(width, height), color='white')
 
-    x, y = translate_text_params(size, width, height)
+    col, row = translate_text_params(size, width, height)
 
     txt = Image.new('L', size=size, color='white')
     draw = ImageDraw.Draw(txt)
     draw.text((0, 0), text, font=font, fill='black')
 
-    image.paste(txt, (x, y))
+    image.paste(txt, (col, row))
 
     return image
 
 
 def translate_text_params(size, width, height):
     """Translate the text."""
-    dx = width - size[0]
-    dy = height - size[1]
-    x = (dx // 2) + (randint(0, dx // 4) * choice([1, -1]))
-    y = (dy // 2) + (randint(0, dy // 4) * choice([1, -1]))
-    return x, y
+    d_col = width - size[0]
+    d_row = height - size[1]
+    col = (d_col // 2) + (randint(0, d_col // 4) * choice([1, -1]))
+    row = (d_row // 2) + (randint(0, d_row // 4) * choice([1, -1]))
+    return col, row
 
 
 def add_snow(data, snow_fract, low=128, high=255):
@@ -72,12 +72,12 @@ def custom_filter(image):
     return image
 
 
-def dirty_image(image, snow_fract, image_filter):
+def x_image(image, snow_fract, image_filter):
     """Make the image look like the real data as much as possible."""
-    dirty = np.array(image).copy()
-    dirty = add_snow(dirty, snow_fract)
-    dirty = Image.fromarray(dirty)
+    x = np.array(image).copy()
+    x = add_snow(x, snow_fract)
+    x = Image.fromarray(x)
 
-    dirty = filter_image(dirty, image_filter)
+    x = filter_image(x, image_filter)
 
-    return dirty
+    return x

@@ -34,7 +34,7 @@ def train(args):
 
     model = get_model(args)
     epoch_start = load_state(args, model)
-    epoch_end = epoch_start + args.epochs + 1
+    epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
     model.to(device)
@@ -46,16 +46,18 @@ def train(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
+    best_loss = 9999.9
+
     for epoch in range(epoch_start, epoch_end):
         train_batches(model, device, criterion, losses, train_loader, optimizer)
         msg = train_log(writer, losses, epoch)
         losses = []
 
         valid_batches(args, model, device, criterion, losses, valid_loader, epoch)
-        valid_log(writer, losses, epoch, msg)
+        avg_loss = valid_log(writer, losses, epoch, msg)
         losses = []
 
-        save_state(args, model, epoch)
+        best_loss = save_state(args, model, epoch, best_loss, avg_loss)
 
     writer.flush()
     writer.close()
@@ -115,6 +117,7 @@ def valid_log(writer, losses, epoch, msg):
     avg_loss = np.mean(losses)
     writer.add_scalar("Loss/valid", avg_loss, epoch)
     logging.info(f'Epoch: {epoch: 3d} Average losses {msg} validation {avg_loss:0.6f}')
+    return avg_loss
 
 
 def get_model(args):
@@ -140,13 +143,23 @@ def get_model(args):
     return model
 
 
-def save_state(args, model, epoch):
+def save_state(args, model, epoch, best_loss, avg_loss):
     """Save the model if the current validation score is better than the best one."""
     # TODO save optimizer too
+
+    model.state_dict()['epoch'] = epoch
+    model.state_dict()['avg_loss'] = avg_loss
+
     if epoch % args.save_every == 0:
-        path = args.state_dir / f'best_autoencoder{epoch}.pth'
-        model.state_dict()['epoch'] = epoch
+        path = args.state_dir / f'save_{args.model}_{epoch}.pth'
         torch.save(model.state_dict(), path)
+
+    if avg_loss < best_loss:
+        path = args.state_dir / f'best_{args.model}_{epoch}.pth'
+        torch.save(model.state_dict(), path)
+        best_loss = avg_loss
+
+    return best_loss
 
 
 def load_state(args, model):
@@ -164,8 +177,10 @@ def get_loaders(args):
     train_split, valid_split = ImageFileDataset.split_files(
         args.x_dir, args.y_dir, args.train_split, args.valid_split)
 
-    train_dataset = ImageFileDataset(train_split, size=(512, 512))
-    valid_dataset = ImageFileDataset(valid_split, size=(512, 512))
+    size = (args.width, args.height)
+
+    train_dataset = ImageFileDataset(train_split, size=size)
+    valid_dataset = ImageFileDataset(valid_split, size=size)
 
     train_loader = DataLoader(
         train_dataset,
@@ -199,16 +214,14 @@ def parse_args():
         help="""How many records to use for training.""")
 
     arg_parser.add_argument(
-        '--x-dir', '-X', required=True,
-        help="""Read dirty images from this directory.""")
-
-    arg_parser.add_argument(
-        '--y-dir', '-Y', required=True,
-        help="""Read clean images from this directory.""")
-
-    arg_parser.add_argument(
         '--valid-split', '-V', type=int, required=True,
         help="""How many records to use for validation.""")
+
+    arg_parser.add_argument(
+        '--x-dir', '-X', required=True, help="""Read X images from this directory.""")
+
+    arg_parser.add_argument(
+        '--y-dir', '-Y', required=True, help="""Read Y images from this directory.""")
 
     arg_parser.add_argument(
         '--state-dir', '-s', help="""Save best models to this directory.""")
@@ -217,7 +230,8 @@ def parse_args():
         '--runs-dir', '-R', help="""Save tensor board logs to this directory.""")
 
     arg_parser.add_argument(
-        '--prediction-dir', '-P', help="""Save model predictions here.""")
+        '--prediction-dir', '-P', help="""Save model predictions here.
+            For debugging.""")
 
     arg_parser.add_argument(
         '--device', '-d',
@@ -226,8 +240,7 @@ def parse_args():
             availability of a GPU.""")
 
     arg_parser.add_argument(
-        '--model', '-m', choices=['autoencoder', 'unet', 'deeplabv3'],
-        default='autoencoder',
+        '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
         help="""What model architecture to use. (default: %(default)s)
             U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
 
@@ -248,6 +261,14 @@ def parse_args():
         help="""Check every -i iterations to see if we should save a snapshot of the
             model. It only saves if the validation loss is less than the previous
             best validation loss. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--width', '-W', type=int, default=512,
+        help="""Crop the images to this width. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--height', '-H', type=int, default=512,
+        help="""Crop the images to this height. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,

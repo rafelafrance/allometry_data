@@ -4,7 +4,9 @@
 --runs-dir=./data/runs
 --train-split=768
 --valid-split=256
---epochs=2
+--epochs=100
 --save-every=10
 --batch-size=4
 --seed=764
+--width=768
+--height=512

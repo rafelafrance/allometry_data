@@ -1,7 +1,9 @@
 --x-dir=./data/test/x
 --y-dir=./data/test/y
---prediction-dir=./data/test/pred
---load-model=./data/state/best_autoencoder100.pth
+--prediction-dir=./data/test/result
+--state=./data/state/best_autoencoder90.pth
 --test-split=256
 --batch-size=4
 --seed=23
+--width=768
+--height=512

@@ -27,8 +27,8 @@ def test(args):
         torch.manual_seed(args.seed)
         seed(args.seed)
 
-    model = Autoencoder()
-    load_model(args, model)
+    model = get_model(args)
+    load_state(args, model)
 
     device = torch.device(args.device)
     model.to(device)
@@ -61,13 +61,13 @@ def save_predictions(args, x, y, pred, name):
     """Save predictions for analysis"""
     if args.prediction_dir:
         for x, y, pred, name in zip(x, y, pred, name):
-            path = join(args.prediction_dir, 'clean', name)
+            path = join(args.prediction_dir, 'x', name)
             save_image(x, path)
 
-            path = join(args.prediction_dir, 'dirty', name)
+            path = join(args.prediction_dir, 'y', name)
             save_image(y, path)
 
-            path = join(args.prediction_dir, 'prediction', name)
+            path = join(args.prediction_dir, 'pred', name)
             save_image(pred, path)
 
 
@@ -82,7 +82,9 @@ def get_loaders(args):
     test_split, *_ = ImageFileDataset.split_files(
         args.x_dir, args.y_dir, args.test_split)
 
-    test_dataset = ImageFileDataset(test_split, size=(512, 512))
+    size = (args.width, args.height)
+
+    test_dataset = ImageFileDataset(test_split, size=size)
 
     test_loader = DataLoader(
         test_dataset,
@@ -93,10 +95,33 @@ def get_loaders(args):
     return test_loader
 
 
-def load_model(args, model):
+def get_model(args):
+    """Get the model to use."""
+    if args.model == 'unet':
+        model = torch.hub.load(
+            'mateuszbuda/brain-segmentation-pytorch',
+            'unet',
+            in_channels=1,
+            out_channels=1,
+            init_features=32,
+            pretrained=False)
+
+    elif args.model == 'deeplabv3':
+        model = torch.hub.load(
+            'pytorch/vision:v0.9.0',
+            'deeplabv3_resnet101',
+            pretrained=False)
+
+    else:
+        model = Autoencoder()
+
+    return model
+
+
+def load_state(args, model):
     """Load a saved model."""
-    if args.load_model:
-        state = torch.load(args.load_model)
+    if args.state:
+        state = torch.load(args.state)
         model.load_state_dict(state)
 
 
@@ -113,17 +138,21 @@ def parse_args():
         help="""How many records to use for testing.""")
 
     arg_parser.add_argument(
-        '--x-dir', '-X', help="""Read dirty images from this directory.""")
+        '--x-dir', '-X', help="""Read X images from this directory.""")
 
     arg_parser.add_argument(
-        '--y-dir', '-Y', help="""Read clean images from this directory.""")
+        '--y-dir', '-Y', help="""Read Y images from this directory.""")
 
     arg_parser.add_argument(
         '--prediction-dir', '-P', help="""Save model predictions here.""")
 
     arg_parser.add_argument(
-        '--load-model', '-L', required=True,
-        help="""Load this state dict to restart the model.""")
+        '--state', '-s', required=True, help="""Load this state dict for testing.""")
+
+    arg_parser.add_argument(
+        '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
+        help="""What model architecture to use. (default: %(default)s)
+            U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
 
     arg_parser.add_argument(
         '--device', '-d',
@@ -138,6 +167,14 @@ def parse_args():
     arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--width', '-W', type=int, default=512,
+        help="""Crop the images to this width. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--height', '-H', type=int, default=512,
+        help="""Crop the images to this height. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int, help="""Create a random seed.""")

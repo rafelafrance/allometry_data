@@ -288,7 +288,7 @@ HEIGHT = 3440
 
 
 ```python
-def clean_image(page, clean_params):
+def y_image(page, clean_params):
     font = clean_params['font']
     font_size = clean_params['font_size']
 
@@ -370,7 +370,7 @@ Dirty the image randomly.
 
 
 ```python
-def dirty_image(image, dirty_params):
+def x_image(image, dirty_params):
     dirty = np.array(image)
     dirty = add_snow(dirty, dirty_params)
     dirty = Image.fromarray(dirty)
@@ -393,10 +393,10 @@ def build_page(base_name, clean_params, dirty_params):
 
     page, data = fake_page()
 
-    clean, size = clean_image(page, clean_params)
+    clean, size = y_image(page, clean_params)
     clean.save(CLEAN_DIR / name, 'JPEG')
 
-    dirty = dirty_image(clean, dirty_params)
+    dirty = x_image(clean, dirty_params)
     dirty.save(DIRTY_DIR / name, 'JPEG')
 
     return data

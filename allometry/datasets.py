@@ -17,7 +17,7 @@ class ImageFileDataset(Dataset):
     def __init__(self, image_pairs, *, size=None):
         """Generate a dataset using pairs of images.
 
-        The pairs are in tuples of (dirty_image, clean_image).
+        The pairs are in tuples of (x_image, y_image).
         """
         self.images = []
         self.size = size
@@ -39,8 +39,6 @@ class ImageFileDataset(Dataset):
 
         x, y = self._crop(x, y)
         x, y = self._rotate(x, y)
-        x, y = self._h_flip(x, y)
-        x, y = self._v_flip(x, y)
 
         x = self._brightness(x)
         x = self._contrast(x)
@@ -52,7 +50,7 @@ class ImageFileDataset(Dataset):
         return x, y, image[2]
 
     def _crop(self, x, y):
-        i, j, h, w = 0, 0, 0, 0  # Linter silliness
+        i, j, h, w = 0, 0, 0, 0  # Squash linter
 
         for _ in range(5):
             i, j, h, w = RandomCrop.get_params(y, output_size=self.size)
@@ -65,35 +63,16 @@ class ImageFileDataset(Dataset):
         return x, y
 
     @staticmethod
-    def _equalize(x):
+    def _orient(x, y):
         if random() < 0.05:
-            x = TF.equalize(x)
-        return x
-
-    @staticmethod
-    def _contrast(x):
-        if random() < 0.05:
-            x = TF.adjust_contrast(x, 2.0)
-        return x
-
-    @staticmethod
-    def _brightness(x):
-        if random() < 0.05:
-            x = TF.adjust_brightness(x, 2.0)
-        return x
-
-    @staticmethod
-    def _v_flip(x, y):
-        if random() < 0.05:
-            x = TF.vflip(x)
-            y = TF.vflip(y)
-        return x, y
-
-    @staticmethod
-    def _h_flip(x, y):
-        if random() < 0.05:
-            x = TF.hflip(x)
-            y = TF.hflip(y)
+            x = TF.rotate(x, 90)
+            y = TF.rotate(y, 90)
+        elif random() < 0.05:
+            x = TF.rotate(x, 180)
+            y = TF.rotate(y, 180)
+        elif random() < 0.05:
+            x = TF.rotate(x, 270)
+            y = TF.rotate(y, 270)
         return x, y
 
     @staticmethod
@@ -105,10 +84,48 @@ class ImageFileDataset(Dataset):
         return x, y
 
     @staticmethod
+    def _h_flip(x, y):
+        if random() < 0.05:
+            x = TF.hflip(x)
+            y = TF.hflip(y)
+        return x, y
+
+    @staticmethod
+    def _v_flip(x, y):
+        if random() < 0.05:
+            x = TF.vflip(x)
+            y = TF.vflip(y)
+        return x, y
+
+    @staticmethod
+    def _brightness(x):
+        if random() < 0.05:
+            x = TF.adjust_brightness(x, 2.0)
+        return x
+
+    @staticmethod
+    def _contrast(x):
+        if random() < 0.05:
+            x = TF.adjust_contrast(x, 2.0)
+        return x
+
+    @staticmethod
+    def _equalize(x):
+        if random() < 0.05:
+            x = TF.equalize(x)
+        return x
+
+    @staticmethod
+    def _normalize(x):
+        if random() < 0.05:
+            x = TF.normalize(x, [0.5], [0.224])
+        return x
+
+    @staticmethod
     def split_files(x_dir, y_dir, *segments, glob='*.jpg'):
         """Split contents of a dir into datasets."""
-        ys = {p.name: p for x in Path(y_dir).glob(glob) if (p := Path(x))}
         xs = {p.name: p for x in Path(x_dir).glob(glob) if (p := Path(x))}
+        ys = {p.name: p for x in Path(y_dir).glob(glob) if (p := Path(x))}
 
         count = sum(segments)
 
