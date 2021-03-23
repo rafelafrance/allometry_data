@@ -1,8 +1,8 @@
 --test-dir=./data/test
 --prediction-dir=./data/result
 --state=./data/state/best_autoencoder.pth
---test-split=256
 --batch-size=6
 --seed=23
 --width=512
 --height=512
+--model=unet

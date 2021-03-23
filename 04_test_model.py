@@ -59,10 +59,10 @@ def save_predictions(args, x, y, pred, name):
     """Save predictions for analysis"""
     if args.prediction_dir:
         for x, y, pred, name in zip(x, y, pred, name):
-            path = join(args.prediction_dir, 'x', name)
+            path = join(args.prediction_dir, 'X', name)
             save_image(x, path)
 
-            path = join(args.prediction_dir, 'y', name)
+            path = join(args.prediction_dir, 'Y', name)
             save_image(y, path)
 
             path = join(args.prediction_dir, 'pred', name)
@@ -77,7 +77,7 @@ def test_log(losses):
 
 def get_loaders(args):
     """Get the data loaders."""
-    test_pairs = ImageFileDataset.get_files(args.train_dir)
+    test_pairs = ImageFileDataset.get_files(args.test_dir)
 
     size = (args.height, args.width)
 

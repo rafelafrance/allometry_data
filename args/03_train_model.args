@@ -7,3 +7,4 @@
 --seed=364
 --width=512
 --height=512
+--model=unet
