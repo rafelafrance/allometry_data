@@ -23,8 +23,6 @@ from allometry.util import finished, started
 
 def train(args):
     """Train the neural net."""
-    logging.info('Starting training')
-
     if args.seed is not None:
         torch.manual_seed(args.seed)
         seed(args.seed)
@@ -175,13 +173,13 @@ def load_state(args, model):
 
 def get_loaders(args):
     """Get the data loaders."""
-    train_split, valid_split = ImageFileDataset.split_files(
-        args.x_dir, args.y_dir, args.train_split, args.valid_split)
+    train_pairs = ImageFileDataset.get_files(args.train_dir)
+    valid_pairs = ImageFileDataset.get_files(args.valid_dir)
 
     size = (args.height, args.width)
 
-    train_dataset = ImageFileDataset(train_split, size=size)
-    valid_dataset = ImageFileDataset(valid_split, size=size)
+    train_dataset = ImageFileDataset(train_pairs, size=size)
+    valid_dataset = ImageFileDataset(valid_pairs, size=size)
 
     train_loader = DataLoader(
         train_dataset,
@@ -211,18 +209,12 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--train-split', '-t', type=int, required=True,
-        help="""How many records to use for training.""")
+        '--train-dir', '-T', required=True,
+        help="""Read training images from the X & Y subdirectories under this one.""")
 
     arg_parser.add_argument(
-        '--valid-split', '-V', type=int, required=True,
-        help="""How many records to use for validation.""")
-
-    arg_parser.add_argument(
-        '--x-dir', '-X', required=True, help="""Read X images from this directory.""")
-
-    arg_parser.add_argument(
-        '--y-dir', '-Y', required=True, help="""Read Y images from this directory.""")
+        '--valid-dir', '-V', required=True,
+        help="""Read validation images from the X & Y subdirectories under this one.""")
 
     arg_parser.add_argument(
         '--state-dir', '-s', help="""Save best models to this directory.""")

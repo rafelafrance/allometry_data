@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-# from tqdm import tqdm
+from tqdm import tqdm
 
 from allometry.autoencoder import Autoencoder
 from allometry.datasets import ImageFileDataset
@@ -21,8 +21,6 @@ from allometry.util import finished, started
 
 def test(args):
     """Train the neural net."""
-    logging.info('Starting testing')
-
     if args.seed is not None:
         torch.manual_seed(args.seed)
         seed(args.seed)
@@ -46,7 +44,7 @@ def test_batches(args, model, device, criterion, loader):
     """Run the validating phase of the epoch."""
     losses = []
     model.eval()
-    for data in loader:
+    for data in tqdm(loader):
         x, y, name = data
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
@@ -79,12 +77,11 @@ def test_log(losses):
 
 def get_loaders(args):
     """Get the data loaders."""
-    test_split, *_ = ImageFileDataset.split_files(
-        args.x_dir, args.y_dir, args.test_split)
+    test_pairs = ImageFileDataset.get_files(args.train_dir)
 
     size = (args.height, args.width)
 
-    test_dataset = ImageFileDataset(test_split, size=size)
+    test_dataset = ImageFileDataset(test_pairs, size=size)
 
     test_loader = DataLoader(
         test_dataset,
@@ -129,19 +126,14 @@ def parse_args():
     """Process command-line arguments."""
     description = """Train a denoising autoencoder used to cleanup dirty label
         images."""
+
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--test-split', '-t', type=int, required=True,
-        help="""How many records to use for testing.""")
-
-    arg_parser.add_argument(
-        '--x-dir', '-X', help="""Read X images from this directory.""")
-
-    arg_parser.add_argument(
-        '--y-dir', '-Y', help="""Read Y images from this directory.""")
+        '--test-dir', '-T', required=True,
+        help="""Read test images from the X & Y subdirectories under this one.""")
 
     arg_parser.add_argument(
         '--prediction-dir', '-P', help="""Save model predictions here.""")

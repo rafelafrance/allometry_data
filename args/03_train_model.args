@@ -1,0 +1,9 @@
+--train-dir=./data/train
+--valid-dir=./data/valid
+--state-dir=./data/state
+--runs-dir=./data/runs
+--epochs=100
+--batch-size=6
+--seed=364
+--width=512
+--height=512

@@ -3,6 +3,7 @@
 from os.path import basename, splitext
 from pathlib import Path
 from random import choice, random
+# from itertools import cycle
 
 FONTS_DIR = Path('.') / 'fonts'
 
@@ -21,18 +22,21 @@ FONT_PARAMS = {
     'CourierPrime-BoldItalic': {},
     'CourierPrime-Italic': {},
     'CourierPrime-Regular': {},
-    'CutiveMono-Regular': {'filter': 'custom-median', 'snow_fract': 0.1},
-    'RobotoMono-Italic-VariableFont_wght': {'size': 32, 'snow_fract': 0.01},
-    'RobotoMono-VariableFont_wght': {'size': 32, 'snow_fract': 0.01},
-    'SyneMono-Regular': {'snow_fract': 0.01},
+    'CutiveMono-Regular': {},
+    'RobotoMono-Italic-VariableFont_wght': {'size': 32},
+    'RobotoMono-VariableFont_wght': {'size': 32},
+    'SyneMono-Regular': {},
     'VT323-Regular': {},
-    'XanhMono-Italic': {'filter': 'custom-median', 'snow_fract': 0.1},
-    'XanhMono-Regular': {'filter': 'custom-median', 'snow_fract': 0.1},
-    'Kingthings_Trypewriter_2': {'snow_fract': 0.01},
+    'XanhMono-Italic': {},
+    'XanhMono-Regular': {},
+    'Kingthings_Trypewriter_2': {},
     'OCRB_Medium': {},
     'OCRB_Regular': {},
     'OcrB2': {},
 }
+
+
+# CURR = cycle(FONTS)
 
 
 def choose_font():
@@ -46,10 +50,10 @@ def choose_font():
 
     size = params.get('size', 36)
 
-    filter_ = 'max' if is_bold else 'custom-max'
+    filter_ = 'custom-max' if is_bold else 'custom-median'
     filter_ = params.get('filter', filter_)
 
-    snow_fract = 0.05 if is_bold else 0.04
-    snow_fract = params.get('snow_fract', snow_fract)
+    # snow_fract = 0.1 if is_bold else 0.2
+    snow_fract = params.get('snow_fract', 0.2)
 
     return font, size, filter_, snow_fract

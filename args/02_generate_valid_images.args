@@ -1,0 +1,5 @@
+--text-dir=./data/page/pool_valid
+--x-dir=./data/valid/X
+--y-dir=./data/valid/Y
+--count=256
+--seed=7013

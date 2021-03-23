@@ -122,22 +122,21 @@ class ImageFileDataset(Dataset):
         return x
 
     @staticmethod
-    def split_files(x_dir, y_dir, *segments, glob='*.jpg'):
+    def get_files(dir_, glob='*.jpg', count=None):
         """Split contents of a dir into datasets."""
-        xs = {p.name: p for x in Path(x_dir).glob(glob) if (p := Path(x))}
-        ys = {p.name: p for x in Path(y_dir).glob(glob) if (p := Path(x))}
+        x_dir = Path(dir_) / 'X'
+        y_dir = Path(dir_) / 'Y'
 
-        count = sum(segments)
+        xs = {p.name: p for x in x_dir.glob(glob) if (p := Path(x))}
+        ys = {p.name: p for x in y_dir.glob(glob) if (p := Path(x))}
 
-        names = set(xs.keys()) & set(ys.keys())
-        names = sample(names, count)
+        name_set = set(xs.keys()) & set(ys.keys())
 
-        splits = [list([]) for _ in segments]
+        count = count if count else len(name_set)
+        count = min(count, len(name_set))
 
-        start, end = 0, 0
-        for s, seg in enumerate(segments):
-            end = start + seg
-            splits[s] = [(xs[n], ys[n]) for n in names[start:end]]
-            start = end
+        names = sample(list(name_set), count)
 
-        return tuple(splits)
+        pairs = [(xs[n], ys[n]) for n in names if n in name_set]
+
+        return pairs

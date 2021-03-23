@@ -18,9 +18,6 @@ HEIGHT = 3440
 
 def build_page(args, page):
     """Build images from the data."""
-    if args.seed is not None:
-        seed(args.seed)
-
     with open(page) as data_file:
         data = json.load(data_file)
 
@@ -41,6 +38,9 @@ def build_page(args, page):
 
 def generate_images(args):
     """Generate the images for the pages."""
+    if args.seed is not None:
+        seed(args.seed)
+
     existing = {p.stem for p in args.y_dir.glob('*.jpg')}
     existing = set() if args.remove_images else existing
 
