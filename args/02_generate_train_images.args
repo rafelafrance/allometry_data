@@ -1,3 +1,3 @@
 --x-dir=./data/train/X
 --y-dir=./data/train/Y
---count=256
+--count=19

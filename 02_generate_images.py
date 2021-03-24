@@ -9,7 +9,7 @@ from random import seed
 
 from tqdm import tqdm
 
-from allometry.font_util import choose_font
+from allometry.font_util import choose_augment
 from allometry.page_image import x_image, y_image
 
 WIDTH = 4500
@@ -23,17 +23,15 @@ def build_page(args, page):
 
     name = page.stem + '.jpg'
 
-    font, font_size, image_filter, snow_fract = choose_font()
+    aug = choose_augment()
 
-    y = y_image(data, font, font_size, WIDTH, HEIGHT)
+    y = y_image(data, aug.font, aug.font_size, WIDTH, HEIGHT)
     if args.y_dir:
         y.save(args.y_dir / name, 'JPEG')
 
-    x = x_image(y, snow_fract, image_filter)
+    x = x_image(y, aug.snow_fract, aug.image_filter, aug.erode)
     if args.x_dir:
         x.save(args.x_dir / name, 'JPEG')
-
-    return data
 
 
 def generate_images(args):

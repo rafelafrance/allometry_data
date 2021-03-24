@@ -51,14 +51,16 @@ def filter_image(image, image_filter):
 
     if image_filter == 'max':
         image = image.filter(ImageFilter.MaxFilter())
+    elif image_filter == 'median':
+        image = image.filter(ImageFilter.MedianFilter())
+    elif image_filter == 'mode':
+        image = image.filter(ImageFilter.ModeFilter())
     elif image_filter == 'custom-max':
         image = custom_filter(image)
         image = image.filter(ImageFilter.MaxFilter())
     elif image_filter == 'custom-median':
         image = custom_filter(image)
         image = image.filter(ImageFilter.MedianFilter())
-    elif image_filter == 'mode':
-        image = image.filter(ImageFilter.ModeFilter())
 
     return image
 
@@ -66,18 +68,34 @@ def filter_image(image, image_filter):
 def custom_filter(image):
     """This filter seems to degrade the image in realistic way."""
     image = image.filter(ImageFilter.Kernel(
-        size=(3, 3),
-        kernel=(-1, 0, 1, 0, -5, 0, 1, 0, -1)
-    ))
+        size=(3, 3), kernel=(1, 0, 1, 0, 0, 0, 1, 0, 1)))
     return image
 
 
-def x_image(image, snow_fract, image_filter):
+def erode_text(image, axis, pixels):
+    """Eat away at the edges of a font."""
+
+
+def erode_filter(image):
+    """Blur the edges."""
+    image = image.filter(ImageFilter.Kernel(
+        size=(3, 3), kernel=(1, 0, 1, 0, 0, 0, 1, 0, 1)))
+    return image
+
+
+def x_image(image, snow_fract, image_filter, erode):
     """Make the image look like the real data as much as possible."""
+    if erode.horiz:
+        erode_text(image, 1, erode.horiz)
+
+    if erode.vert:
+        erode_text(image, 0, erode.vert)
+
     x = np.array(image).copy()
     x = add_snow(x, snow_fract)
     x = Image.fromarray(x)
 
-    x = filter_image(x, image_filter)
+    if not (erode.horiz or erode.vert):
+        x = filter_image(x, image_filter)
 
     return x
