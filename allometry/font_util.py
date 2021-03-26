@@ -14,8 +14,7 @@ FONTS = sorted([str(f) for f in FONTS])
 BOLD = [f for f in FONTS if f.casefold().find('bold') > -1]
 REGULAR = [f for f in FONTS if f not in BOLD]
 
-Erode = namedtuple('Erode', 'horiz vert')
-AugmentParams = namedtuple('AugmentParams', 'font font_size filter snow_fract erode')
+AugmentParams = namedtuple('AugmentParams', 'font font_size filter snow_fract')
 
 FONT_PARAMS = {
     'B612Mono-Bold': {},
@@ -61,14 +60,4 @@ def choose_augment():
     # snow_fract = 0.1 if is_bold else 0.2
     snow_fract = params.get('snow_fract', 0.2)
 
-    pixels = 2 if is_bold else 1
-    if random() < 0.1:
-        erode = Erode(horiz=pixels, vert=0)
-    elif random() < 0.1:
-        erode = Erode(horiz=0, vert=pixels)
-    # elif random() < 0.1:
-    #     erode = Erode(horiz=pixels, vert=pixels)
-    else:
-        erode = Erode(horiz=0, vert=0)
-
-    return AugmentParams(font, font_size, filter_, snow_fract, erode)
+    return AugmentParams(font, font_size, filter_, snow_fract)

@@ -72,30 +72,10 @@ def custom_filter(image):
     return image
 
 
-def erode_text(image, axis, pixels):
-    """Eat away at the edges of a font."""
-
-
-def erode_filter(image):
-    """Blur the edges."""
-    image = image.filter(ImageFilter.Kernel(
-        size=(3, 3), kernel=(1, 0, 1, 0, 0, 0, 1, 0, 1)))
-    return image
-
-
-def x_image(image, snow_fract, image_filter, erode):
+def x_image(image, snow_fract, image_filter):
     """Make the image look like the real data as much as possible."""
-    if erode.horiz:
-        erode_text(image, 1, erode.horiz)
-
-    if erode.vert:
-        erode_text(image, 0, erode.vert)
-
     x = np.array(image).copy()
     x = add_snow(x, snow_fract)
     x = Image.fromarray(x)
-
-    if not (erode.horiz or erode.vert):
-        x = filter_image(x, image_filter)
-
+    x = filter_image(x, image_filter)
     return x

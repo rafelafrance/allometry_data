@@ -29,7 +29,7 @@ def build_page(args, page):
     if args.y_dir:
         y.save(args.y_dir / name, 'JPEG')
 
-    x = x_image(y, aug.snow_fract, aug.image_filter, aug.erode)
+    x = x_image(y, aug.snow_fract, aug.image_filter)
     if args.x_dir:
         x.save(args.x_dir / name, 'JPEG')
 

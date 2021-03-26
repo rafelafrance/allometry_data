@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Look at at results from the model."""
+"""Look at at results from a model."""
 
 import argparse
 import logging
