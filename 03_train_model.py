@@ -84,7 +84,7 @@ def valid_batches(args, model, device, criterion, losses, loader, epoch):
     model.eval()
 
     # Use the same validation images for each epoch i.e. same augmentations
-    rand_state = ImageFileDataset.set_state(args.seed)
+    rand_state = ImageFileDataset.get_state(args.seed)
 
     for data in loader:
         x, y, name = data
