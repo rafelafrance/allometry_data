@@ -53,8 +53,6 @@ def filter_image(image, image_filter):
         image = image.filter(ImageFilter.MaxFilter())
     elif image_filter == 'median':
         image = image.filter(ImageFilter.MedianFilter())
-    elif image_filter == 'mode':
-        image = image.filter(ImageFilter.ModeFilter())
     elif image_filter == 'custom-max':
         image = custom_filter(image)
         image = image.filter(ImageFilter.MaxFilter())

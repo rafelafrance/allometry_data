@@ -4,6 +4,7 @@
 import argparse
 import logging
 import textwrap
+from datetime import date
 from os.path import join
 from pathlib import Path
 from random import seed
@@ -26,6 +27,8 @@ def train(args):
     if args.seed is not None:
         torch.manual_seed(args.seed)
         seed(args.seed)
+
+    name = f'{args.model}_{date.today().isoformat()}'
 
     writer = SummaryWriter(args.runs_dir)
 
@@ -54,7 +57,7 @@ def train(args):
         avg_loss = valid_log(writer, losses, epoch, msg, best_loss)
         losses = []
 
-        best_loss = save_state(args, model, epoch, best_loss, avg_loss)
+        best_loss = save_state(args, model, epoch, best_loss, avg_loss, name)
 
     writer.flush()
     writer.close()
@@ -142,7 +145,7 @@ def get_model(args):
     return model
 
 
-def save_state(args, model, epoch, best_loss, avg_loss):
+def save_state(args, model, epoch, best_loss, avg_loss, name):
     """Save the model if the current validation score is better than the best one."""
     # TODO save optimizer too
 
@@ -150,11 +153,11 @@ def save_state(args, model, epoch, best_loss, avg_loss):
     model.state_dict()['avg_loss'] = avg_loss
 
     if args.save_every and epoch % args.save_every == 0:
-        path = args.state_dir / f'save_{args.model}_{epoch}.pth'
+        path = args.state_dir / f'save_{name}_{epoch}.pth'
         torch.save(model.state_dict(), path)
 
     if args.save_best and avg_loss < best_loss:
-        path = args.state_dir / f'best_{args.model}.pth'
+        path = args.state_dir / f'best_{name}.pth'
         torch.save(model.state_dict(), path)
         best_loss = avg_loss
 
@@ -251,8 +254,7 @@ def parse_args():
 
     arg_parser.add_argument(
         '--save-every', '-i', type=int,
-        help="""Check every -i iterations to see if we should save a snapshot of the
-            model. (default: %(default)s)""")
+        help="""Save a snapshot of the model every -i iterations.""")
 
     arg_parser.add_argument(
         '--width', '-W', type=int, default=512,
