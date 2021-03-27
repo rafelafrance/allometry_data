@@ -28,11 +28,11 @@ class ImageFileDataset(Dataset):
     @staticmethod
     def get_state(seed_):
         """Get the current random state so we can return to it later."""
-        random_state = None
+        rand_state = None
         if seed_ is not None:
-            random_state = getstate()
+            rand_state = getstate()
             seed(seed_)
-        return random_state
+        return rand_state
 
     @staticmethod
     def set_state(rand_state):
