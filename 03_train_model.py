@@ -29,6 +29,7 @@ def train(args):
         seed(args.seed)
 
     name = f'{args.model}_{date.today().isoformat()}'
+    name = f'{name}_{args.suffix}' if args.suffix else name
 
     writer = SummaryWriter(args.runs_dir)
 
@@ -81,6 +82,10 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
 def valid_batches(args, model, device, criterion, losses, loader, epoch):
     """Run the validating phase of the epoch."""
     model.eval()
+
+    # Use the same validation images for each epoch i.e. same augmentations
+    rand_state = ImageFileDataset.set_state(args.seed)
+
     for data in loader:
         x, y, name = data
         x, y = x.to(device), y.to(device)
@@ -89,6 +94,9 @@ def valid_batches(args, model, device, criterion, losses, loader, epoch):
             batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
         save_predictions(args, x, y, pred, name, epoch)
+
+    # Return to the current state of the training random number generator
+    ImageFileDataset.set_state(rand_state)
 
 
 def save_predictions(args, x, y, pred, name, epoch):
@@ -195,7 +203,6 @@ def get_loaders(args):
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
         drop_last=True,
         num_workers=args.workers,
     )
@@ -239,6 +246,10 @@ def parse_args():
         '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
         help="""What model architecture to use. (default: %(default)s)
             U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
+
+    arg_parser.add_argument(
+        '--suffix',
+        help="""Add this to the model name to differentiate it from other runs.""")
 
     arg_parser.add_argument(
         '--epochs', '-e', type=int, default=100,

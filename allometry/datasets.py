@@ -2,7 +2,7 @@
 
 import random
 from pathlib import Path
-from random import random, randrange, sample
+from random import getstate, random, randrange, sample, seed, setstate
 
 import numpy as np
 import torchvision.transforms.functional as TF
@@ -15,10 +15,7 @@ class ImageFileDataset(Dataset):
     """Get data from image files stored in 'x_dir' and 'y_dir' directories."""
 
     def __init__(self, image_pairs, *, size=None):
-        """Generate a dataset using pairs of images.
-
-        The pairs are in tuples of (x_image, y_image).
-        """
+        """Generate a dataset using pairs of images."""
         self.images = []
         self.size = size
 
@@ -27,6 +24,21 @@ class ImageFileDataset(Dataset):
 
         for x, y in image_pairs:
             self.images.append((x, y, x.name))
+
+    @staticmethod
+    def get_state(seed_):
+        """Get the current random state so we can return to it later."""
+        random_state = None
+        if seed_ is not None:
+            random_state = getstate()
+            seed(seed_)
+        return random_state
+
+    @staticmethod
+    def set_state(rand_state):
+        """Continue with an existing random number generator."""
+        if rand_state is not None:
+            setstate(rand_state)
 
     def __len__(self):
         return len(self.images)
