@@ -13,3 +13,5 @@ Trying to OCR the images directly has not worked well. The pages are old and nev
     1. Compare the OCR output to the text generated in step 1.
     1. If they compare favorably then just use the OCR output.
     1. If they do not, then we will need to do our best to correct the problems. This may be as easy as simple text manipulation, or it may require another neural network (probably a transformer network).
+
+Test
