@@ -233,8 +233,7 @@ def parse_args():
         '--runs-dir', '-R', help="""Save tensor board logs to this directory.""")
 
     arg_parser.add_argument(
-        '--prediction-dir', '-P', help="""Save model predictions here.
-            For debugging.""")
+        '--prediction-dir', '-P', help="""Save model predictions here.""")
 
     arg_parser.add_argument(
         '--device', '-d',
@@ -280,8 +279,7 @@ def parse_args():
         help="""Number of workers for loading data. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--load-state', '-L',
-        help="""Load this state dict to restart the model.""")
+        '--load-state', '-L', help="""Load this state dict to restart the model.""")
 
     arg_parser.add_argument(
         '--no-save-best', '-B', action='store_false', dest='save_best',

@@ -1,4 +1,5 @@
 """Common functions for generating allometry images from text."""
+
 from random import choice, randint
 
 import numpy as np

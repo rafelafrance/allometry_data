@@ -1,6 +1,5 @@
 """Training and  validation datasets either generated on the fly or from files."""
 
-import random
 from pathlib import Path
 from random import getstate, random, randrange, sample, seed, setstate
 

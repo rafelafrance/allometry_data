@@ -1,8 +1,8 @@
 --test-dir=./data/test
---prediction-dir=./data/result/autoencoder_2021-03-22_a
---state=./data/state/best_autoencoder_2021-03-22_a.pth
+--prediction-dir=./data/result/unet_2021-03-27_a
+--state=./data/state/best_unet_2021-03-27_a.pth
 --batch-size=6
 --seed=23
 --width=512
 --height=512
---model=autoencoder
+--model=unet

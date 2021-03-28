@@ -2,10 +2,10 @@
 --valid-dir=./data/valid
 --state-dir=./data/state
 --runs-dir=./data/runs
---epochs=100
+--epochs=200
 --batch-size=6
 --seed=364
 --width=512
 --height=512
---model=autoencoder
+--model=unet
 --suffix=a
