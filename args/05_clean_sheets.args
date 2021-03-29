@@ -1,0 +1,8 @@
+--allometry-dir=./data/old/tables
+--clean-dir=./data/cleaned
+--state=./data/state/best_autoencoder_2021-03-27_a.pth
+--model=autoencoder
+--width=512
+--height=512
+--rotate=270
+--batch-size=6

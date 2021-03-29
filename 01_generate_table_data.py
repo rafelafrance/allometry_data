@@ -7,6 +7,7 @@ import string
 import textwrap
 import uuid
 from datetime import datetime, timedelta
+from os import makedirs
 from pathlib import Path
 from random import choice, randint, random, seed
 
@@ -186,21 +187,26 @@ def generate_table():
     return data
 
 
-def generate_pages(args):
-    """Generate fake page data."""
-    if args.seed is not None:
-        seed(args.seed)
-
-    types = {
-        'table': generate_table,
-    }
-    type_choices = list(types.keys())
-
-    text_dir = Path(args.text_dir)
+def make_dirs(args):
+    """Create output directories."""
+    makedirs(args.text_dir, exist_ok=True)
 
     if args.remove_pages:
         for path in Path(args.text_dir).glob('*.json'):
             path.unlink()
+
+
+def generate_pages(args):
+    """Generate fake page data."""
+    make_dirs(args)
+
+    if args.seed is not None:
+        seed(args.seed)
+
+    types = {'table': generate_table}
+    type_choices = list(types.keys())
+
+    text_dir = Path(args.text_dir)
 
     for _ in range(args.count):
         type_ = choice(type_choices)

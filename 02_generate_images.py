@@ -4,6 +4,7 @@
 import argparse
 import json
 import textwrap
+from os import makedirs
 from pathlib import Path
 from random import seed
 
@@ -34,8 +35,26 @@ def build_page(args, page):
         x.save(args.x_dir / name, 'JPEG')
 
 
+def make_dirs(args):
+    """Create output directories."""
+    if args.x_dir:
+        makedirs(args.x_dir, exist_ok=True)
+    if args.y_dir:
+        makedirs(args.y_dir, exist_ok=True)
+
+    if args.remove_images:
+        if args.y_dir:
+            for path in args.y_dir.glob('*.jpg'):
+                path.unlink()
+        if args.x_dir:
+            for path in args.x_dir.glob('*.jpg'):
+                path.unlink()
+
+
 def generate_images(args):
     """Generate the images for the pages."""
+    make_dirs(args)
+
     if args.seed is not None:
         seed(args.seed)
 
@@ -47,14 +66,6 @@ def generate_images(args):
 
     if args.count:
         pages = pages[:args.count]
-
-    if args.remove_images:
-        if args.y_dir:
-            for path in args.y_dir.glob('*.jpg'):
-                path.unlink()
-        if args.x_dir:
-            for path in args.x_dir.glob('*.jpg'):
-                path.unlink()
 
     for page in tqdm(pages):
         build_page(args, page)
@@ -72,11 +83,6 @@ def parse_args():
         help="""Where is the text data stored.""")
 
     arg_parser.add_argument(
-        '--count', '-c', type=int,
-        help="""How many images to create. If omitted then it will process
-            all of the files in the --text-dir.""")
-
-    arg_parser.add_argument(
         '--x-dir', '-X', help="""Save the x images to this directory.""")
 
     arg_parser.add_argument(
@@ -86,6 +92,11 @@ def parse_args():
         '--remove-images', '-R', action='store_true',
         help="""Should we clear all of the existing images in the --x-dir &
             --y-dir.""")
+
+    arg_parser.add_argument(
+        '--count', '-c', type=int,
+        help="""How many images to create. If omitted then it will process
+            all of the files in the --text-dir.""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int,

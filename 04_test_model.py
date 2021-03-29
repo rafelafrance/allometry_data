@@ -4,7 +4,9 @@
 import argparse
 import logging
 import textwrap
+from os import makedirs
 from os.path import join
+from pathlib import Path
 from random import seed
 
 import numpy as np
@@ -13,35 +15,35 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 from tqdm import tqdm
 
-from allometry.autoencoder import Autoencoder
-from allometry.datasets import ImageFileDataset
+from allometry.image_parts import ImageParts
 from allometry.metrics import BinaryDiceLoss
+from allometry.model_util import get_model, load_state
 from allometry.util import finished, started
 
 
 def test(args):
-    """Train the neural net."""
+    """Test the neural net."""
+    make_dirs(args)
+
     if args.seed is not None:
         torch.manual_seed(args.seed)
         seed(args.seed)
 
-    model = get_model(args)
-    load_state(args, model)
+    model = get_model(args.model)
+    load_state(args.state, model)
 
     device = torch.device(args.device)
     model.to(device)
 
     criterion = BinaryDiceLoss()
-
-    test_loader = get_loaders(args)
-
-    losses = test_batches(args, model, device, criterion, test_loader)
+    loader = get_loader(args)
+    losses = batches(model, device, criterion, loader, args.prediction_dir)
 
     test_log(losses)
 
 
-def test_batches(args, model, device, criterion, loader):
-    """Run the validating phase of the epoch."""
+def batches(model, device, criterion, loader, prediction_dir):
+    """Test the model."""
     losses = []
     model.eval()
     for data in tqdm(loader):
@@ -51,21 +53,21 @@ def test_batches(args, model, device, criterion, loader):
             pred = model(x)
             batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
-        save_predictions(args, x, y, pred, name)
+        save_predictions(prediction_dir, x, y, pred, name)
     return losses
 
 
-def save_predictions(args, x, y, pred, name):
+def save_predictions(prediction_dir, x, y, pred, name):
     """Save predictions for analysis"""
-    if args.prediction_dir:
+    if prediction_dir:
         for x, y, pred, name in zip(x, y, pred, name):
-            path = join(args.prediction_dir, 'X', name)
+            path = join(prediction_dir, 'X', name)
             save_image(x, path)
 
-            path = join(args.prediction_dir, 'Y', name)
+            path = join(prediction_dir, 'Y', name)
             save_image(y, path)
 
-            path = join(args.prediction_dir, 'pred', name)
+            path = join(prediction_dir, 'pred', name)
             save_image(pred, path)
 
 
@@ -75,57 +77,25 @@ def test_log(losses):
     logging.info(f'Average test loss {avg_loss:0.6f}')
 
 
-def get_loaders(args):
+def get_loader(args):
     """Get the data loaders."""
-    test_pairs = ImageFileDataset.get_files(args.test_dir)
-
+    pairs = ImageParts.get_files(args.test_dir)
     size = (args.height, args.width)
-
-    test_dataset = ImageFileDataset(test_pairs, size=size)
-
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.workers,
-    )
-
-    return test_loader
+    dataset = ImageParts(pairs, size=size)
+    return DataLoader(dataset, batch_size=args.batch_size, num_workers=args.workers)
 
 
-def get_model(args):
-    """Get the model to use."""
-    if args.model == 'unet':
-        model = torch.hub.load(
-            'mateuszbuda/brain-segmentation-pytorch',
-            'unet',
-            in_channels=1,
-            out_channels=1,
-            init_features=32,
-            pretrained=False)
-
-    elif args.model == 'deeplabv3':
-        model = torch.hub.load(
-            'pytorch/vision:v0.9.0',
-            'deeplabv3_resnet101',
-            pretrained=False)
-
-    else:
-        model = Autoencoder()
-
-    return model
-
-
-def load_state(args, model):
-    """Load a saved model."""
-    if args.state:
-        state = torch.load(args.state)
-        model.load_state_dict(state)
+def make_dirs(args):
+    """Create output directories."""
+    if args.prediction_dir:
+        makedirs(Path(args.prediction_dir) / 'X', exist_ok=True)
+        makedirs(Path(args.prediction_dir) / 'Y', exist_ok=True)
+        makedirs(Path(args.prediction_dir) / 'pred', exist_ok=True)
 
 
 def parse_args():
     """Process command-line arguments."""
-    description = """Train a denoising autoencoder used to cleanup dirty label
-        images."""
+    description = """Test a denoising autoencoder used to cleanup allometry sheets."""
 
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
@@ -143,8 +113,7 @@ def parse_args():
 
     arg_parser.add_argument(
         '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
-        help="""What model architecture to use. (default: %(default)s)
-            U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
+        help="""What model architecture to use. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--device', '-d',

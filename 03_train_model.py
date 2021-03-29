@@ -5,7 +5,7 @@ import argparse
 import logging
 import textwrap
 from datetime import date
-from os.path import join
+from os import makedirs
 from pathlib import Path
 from random import seed
 
@@ -14,16 +14,17 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.utils import save_image
 
-from allometry.autoencoder import Autoencoder
-from allometry.datasets import ImageFileDataset
+from allometry.image_parts import ImageParts
 from allometry.metrics import BinaryDiceLoss
+from allometry.model_util import get_model, load_state
 from allometry.util import finished, started
 
 
 def train(args):
     """Train the neural net."""
+    make_dirs(args)
+
     if args.seed is not None:
         torch.manual_seed(args.seed)
         seed(args.seed)
@@ -33,8 +34,8 @@ def train(args):
 
     writer = SummaryWriter(args.runs_dir)
 
-    model = get_model(args)
-    epoch_start = load_state(args, model)
+    model = get_model(args.model)
+    epoch_start = load_state(args.state, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
@@ -54,11 +55,11 @@ def train(args):
         msg = train_log(writer, losses, epoch)
         losses = []
 
-        valid_batches(args, model, device, criterion, losses, valid_loader, epoch)
+        valid_batches(model, device, criterion, losses, valid_loader, args.seed)
         avg_loss = valid_log(writer, losses, epoch, msg, best_loss)
         losses = []
 
-        best_loss = save_state(args, model, epoch, best_loss, avg_loss, name)
+        best_loss = save_state(model, epoch, best_loss, avg_loss, name, args.state_dir)
 
     writer.flush()
     writer.close()
@@ -79,12 +80,12 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
             optimizer.step()
 
 
-def valid_batches(args, model, device, criterion, losses, loader, epoch):
+def valid_batches(model, device, criterion, losses, loader, seed_):
     """Run the validating phase of the epoch."""
     model.eval()
 
     # Use the same validation images for each epoch i.e. same augmentations
-    rand_state = ImageFileDataset.get_state(args.seed)
+    rand_state = ImageParts.get_state(seed_)
 
     for data in loader:
         x, y, name = data
@@ -93,24 +94,9 @@ def valid_batches(args, model, device, criterion, losses, loader, epoch):
             pred = model(x)
             batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
-        save_predictions(args, x, y, pred, name, epoch)
 
     # Return to the current state of the training random number generator
-    ImageFileDataset.set_state(rand_state)
-
-
-def save_predictions(args, x, y, pred, name, epoch):
-    """Save predictions for analysis"""
-    if args.prediction_dir:
-        for x_, y_, pred_, name_ in zip(x, y, pred, name):
-            path = join(args.prediction_dir, 'x', f'{epoch}_{name_}')
-            save_image(x_, path)
-
-            path = join(args.prediction_dir, 'y', f'{epoch}_{name_}')
-            save_image(y_, path)
-
-            path = join(args.prediction_dir, 'pred', f'{epoch}_{name_}')
-            save_image(pred_, path)
+    ImageParts.set_state(rand_state)
 
 
 def train_log(writer, losses, epoch):
@@ -130,67 +116,29 @@ def valid_log(writer, losses, epoch, msg, best_loss):
     return avg_loss
 
 
-def get_model(args):
-    """Get the model to use."""
-    if args.model == 'unet':
-        model = torch.hub.load(
-            'mateuszbuda/brain-segmentation-pytorch',
-            'unet',
-            in_channels=1,
-            out_channels=1,
-            init_features=32,
-            pretrained=False)
-
-    elif args.model == 'deeplabv3':
-        model = torch.hub.load(
-            'pytorch/vision:v0.9.0',
-            'deeplabv3_resnet101',
-            pretrained=False)
-
-    else:
-        model = Autoencoder()
-
-    return model
-
-
-def save_state(args, model, epoch, best_loss, avg_loss, name):
+def save_state(model, epoch, best_loss, avg_loss, name, state_dir):
     """Save the model if the current validation score is better than the best one."""
     # TODO save optimizer too
-
     model.state_dict()['epoch'] = epoch
     model.state_dict()['avg_loss'] = avg_loss
 
-    if args.save_every and epoch % args.save_every == 0:
-        path = args.state_dir / f'save_{name}_{epoch}.pth'
-        torch.save(model.state_dict(), path)
-
-    if args.save_best and avg_loss < best_loss:
-        path = args.state_dir / f'best_{name}.pth'
+    if avg_loss < best_loss:
+        path = state_dir / f'best_{name}.pth'
         torch.save(model.state_dict(), path)
         best_loss = avg_loss
 
     return best_loss
 
 
-def load_state(args, model):
-    """Load a saved model."""
-    start = 1
-    if args.load_state:
-        state = torch.load(args.load_state)
-        model.load_state_dict(state)
-        start = model.state_dict()['epoch'] + 1
-    return start
-
-
 def get_loaders(args):
     """Get the data loaders."""
-    train_pairs = ImageFileDataset.get_files(args.train_dir)
-    valid_pairs = ImageFileDataset.get_files(args.valid_dir)
+    train_pairs = ImageParts.get_files(args.train_dir)
+    valid_pairs = ImageParts.get_files(args.valid_dir)
 
     size = (args.height, args.width)
 
-    train_dataset = ImageFileDataset(train_pairs, size=size)
-    valid_dataset = ImageFileDataset(valid_pairs, size=size)
+    train_dataset = ImageParts(train_pairs, size=size)
+    valid_dataset = ImageParts(valid_pairs, size=size)
 
     train_loader = DataLoader(
         train_dataset,
@@ -210,10 +158,17 @@ def get_loaders(args):
     return train_loader, valid_loader
 
 
+def make_dirs(args):
+    """Create output directories."""
+    if args.state_dir:
+        makedirs(args.state_dir, exist_ok=True)
+    if args.runs_dir:
+        makedirs(args.runs_dir, exist_ok=True)
+
+
 def parse_args():
     """Process command-line arguments."""
-    description = """Train a denoising autoencoder used to cleanup dirty label
-        images."""
+    description = """Train a denoising autoencoder used to cleanup allometry sheets."""
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
         fromfile_prefix_chars='@')
@@ -233,9 +188,6 @@ def parse_args():
         '--runs-dir', '-R', help="""Save tensor board logs to this directory.""")
 
     arg_parser.add_argument(
-        '--prediction-dir', '-P', help="""Save model predictions here.""")
-
-    arg_parser.add_argument(
         '--device', '-d',
         help="""Which GPU or CPU to use. Options are 'cpu', 'cuda:0', 'cuda:1' etc.
             We'll try to default to either 'cpu' or 'cuda:0' depending on the
@@ -243,8 +195,7 @@ def parse_args():
 
     arg_parser.add_argument(
         '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
-        help="""What model architecture to use. (default: %(default)s)
-            U-Net and DeepLabV3-ResNet101 are untrained versions from PyTorch Hub.""")
+        help="""What model architecture to use. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--suffix',
@@ -263,10 +214,6 @@ def parse_args():
         help="""Input batch size. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--save-every', '-i', type=int,
-        help="""Save a snapshot of the model every -i iterations.""")
-
-    arg_parser.add_argument(
         '--width', '-W', type=int, default=512,
         help="""Crop the images to this width. (default: %(default)s)""")
 
@@ -279,11 +226,7 @@ def parse_args():
         help="""Number of workers for loading data. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--load-state', '-L', help="""Load this state dict to restart the model.""")
-
-    arg_parser.add_argument(
-        '--no-save-best', '-B', action='store_false', dest='save_best',
-        help="""Save the model with the best validation score.""")
+        '--state', '-L', help="""Load this state dict to restart the model.""")
 
     arg_parser.add_argument(
         '--seed', '-S', type=int, help="""Create a random seed.""")

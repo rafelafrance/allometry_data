@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import RandomCrop
 
 
-class ImageFileDataset(Dataset):
+class ImageParts(Dataset):
     """Get data from image files stored in 'x_dir' and 'y_dir' directories."""
 
     def __init__(self, image_pairs, *, size=None):

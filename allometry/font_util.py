@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 from os.path import basename, splitext
-from random import choice, random
+# from random import choice, random
 
 from allometry.consts import FONTS_DIR
 
@@ -39,13 +39,13 @@ FONT_PARAMS = {
 }
 
 
-CURR = cycle(FONTS)
+FONT = cycle(FONTS)
 
 
 def choose_augment():
     """Randomly select a font to use for the image."""
     # font = choice(BOLD) if random() < 0.5 else choice(REGULAR)
-    font = next(CURR)
+    font = next(FONT)
     is_bold = font.casefold().find('bold') > -1
 
     name = splitext(basename(font))[0]
