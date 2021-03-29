@@ -35,7 +35,7 @@ def translate_text_params(size, width, height):
     return col, row
 
 
-def add_snow(data, snow_fract, low=128, high=255):
+def add_snow(data, snow_fract, low=254, high=255):
     """Add random pixels to the image to create snow."""
     shape = data.shape
     data = data.flatten()

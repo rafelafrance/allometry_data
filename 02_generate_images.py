@@ -30,8 +30,9 @@ def build_page(args, page):
     if args.y_dir:
         y.save(args.y_dir / name, 'JPEG')
 
-    x = x_image(y, aug.snow_fract, aug.image_filter)
+    x = x_image(y, aug.snow_fract, aug.filter)
     if args.x_dir:
+        # x.save(args.x_dir / f'{Path(aug.font).stem}_{name}', 'JPEG')
         x.save(args.x_dir / name, 'JPEG')
 
 

@@ -25,17 +25,17 @@ FONT_PARAMS = {
     'CourierPrime-BoldItalic': {},
     'CourierPrime-Italic': {},
     'CourierPrime-Regular': {},
-    'CutiveMono-Regular': {},
-    'RobotoMono-Italic-VariableFont_wght': {'size': 32},
-    'RobotoMono-VariableFont_wght': {'size': 32},
-    'SyneMono-Regular': {},
-    'VT323-Regular': {},
-    'XanhMono-Italic': {},
-    'XanhMono-Regular': {},
+    'CutiveMono-Regular': {'snow_fract': 0.25, 'filter': 'custom-max'},
     'Kingthings_Trypewriter_2': {},
     'OCRB_Medium': {},
     'OCRB_Regular': {},
     'OcrB2': {},
+    'RobotoMono-Italic-VariableFont_wght': {'size': 32},
+    'RobotoMono-VariableFont_wght': {'size': 32},
+    'SyneMono-Regular': {},
+    'VT323-Regular': {},
+    'XanhMono-Italic': {'snow_fract': 0.25, 'filter': 'custom-max'},
+    'XanhMono-Regular': {'snow_fract': 0.25, 'filter': 'custom-max'},
 }
 
 
@@ -44,20 +44,15 @@ FONT = cycle(FONTS)
 
 def choose_augment():
     """Randomly select a font to use for the image."""
-    # font = choice(BOLD) if random() < 0.5 else choice(REGULAR)
     font = next(FONT)
-    is_bold = font.casefold().find('bold') > -1
-
     name = splitext(basename(font))[0]
-
     params = FONT_PARAMS.get(name, {})
 
     font_size = params.get('size', 36)
 
-    filter_ = 'custom-max' if is_bold else 'custom-median'
+    filter_ = 'max'  # if is_bold else 'custom-max'
     filter_ = params.get('filter', filter_)
 
-    # snow_fract = 0.1 if is_bold else 0.2
-    snow_fract = params.get('snow_fract', 0.2)
+    snow_fract = params.get('snow_fract', 0.10)
 
     return AugmentParams(font, font_size, filter_, snow_fract)

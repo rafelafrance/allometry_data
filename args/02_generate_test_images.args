@@ -3,3 +3,4 @@
 --y-dir=./data/test/Y
 --count=256
 --seed=7793
+--remove-images
