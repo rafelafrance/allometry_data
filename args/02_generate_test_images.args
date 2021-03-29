@@ -1,6 +1,5 @@
 --text-dir=./data/page/pool_test
 --x-dir=./data/test/X
 --y-dir=./data/test/Y
---count=256
---seed=7793
+--seed=8293
 --remove-images
