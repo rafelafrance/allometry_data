@@ -1,9 +1,14 @@
 """Common functions for generating allometry images from text."""
 
-from random import choice, randint
+from random import choice, randint, randrange
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+
+ABLATE_FRACT = 0.10
+ABLATE_LOW = 2
+ABLATE_HIGH = 4
 
 
 def y_image(data, font, font_size, width, height):
@@ -65,16 +70,29 @@ def filter_image(image, image_filter):
 
 
 def custom_filter(image):
-    """This filter seems to degrade the image in realistic way."""
+    """Degrade image in realistic way."""
     image = image.filter(ImageFilter.Kernel(
         size=(3, 3), kernel=(1, 0, 1, 0, 0, 0, 1, 0, 1)))
     return image
 
 
-def x_image(image, snow_fract, image_filter):
+def x_snow_filter(image, snow_fract, image_filter):
     """Make the image look like the real data as much as possible."""
     x = np.array(image).copy()
     x = add_snow(x, snow_fract)
     x = Image.fromarray(x)
     x = filter_image(x, image_filter)
     return x
+
+
+def ablate_pixels(image):
+    """Remove blocks of pixels from the image."""
+    width, height = image.size
+    how_many = int(width * height * ABLATE_FRACT)
+    for _ in range(how_many):
+        w, h = randint(ABLATE_LOW, ABLATE_HIGH), randint(ABLATE_LOW, ABLATE_HIGH)
+        x0, y0 = randrange(width-w), randrange(height-h)
+        for x in range(x0, x0 + w):
+            for y in range(y0, y0 + h):
+                image[x, y] = 255
+    return image

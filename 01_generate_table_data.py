@@ -11,8 +11,9 @@ from os import makedirs
 from pathlib import Path
 from random import choice, randint, random, seed
 
-from allometry.consts import ITIS_DIR
+from allometry.const import ITIS_DIR
 from allometry.util import finished, started
+from tqdm import tqdm
 
 GUTTER = ' ' * 6  # Spaces between columns
 
@@ -51,7 +52,7 @@ with open(ITIS_DIR / 'genera.txt') as in_file:
 
 
 def fake_id(width=20):
-    """Get a species or genera name for the species"""
+    """Get a species or genera name for the species."""
     id_ = choice(SPECIES) if random() < 0.8 else choice(GENERA)
     return id_[:width].ljust(width)
 
@@ -128,7 +129,7 @@ def fake_lines(rows):
 
 def fake_header(line_len):
     """Generate fake page header."""
-    header = ' '.join(list('STATISTICAL ANANYSIS SYSTEM'))
+    header = ' '.join(list('STATISTICAL ANALYSIS SYSTEM'))
     header = header.center(line_len)
     page_no = randint(1, 9)
     header += '  ' + str(page_no)
@@ -208,7 +209,7 @@ def generate_pages(args):
 
     text_dir = Path(args.text_dir)
 
-    for _ in range(args.count):
+    for _ in tqdm(range(args.count)):
         type_ = choice(type_choices)
         name = f'{type_}_{uuid.uuid4()}.json'
         data = types[type_]()

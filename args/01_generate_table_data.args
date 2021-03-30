@@ -1,2 +1,3 @@
---text-dir=./data/page
+--text-dir=./data/page/pool
 --count=10000
+--seed=4480
