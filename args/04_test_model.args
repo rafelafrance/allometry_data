@@ -1,8 +1,8 @@
 --test-dir=./data/test
---prediction-dir=./data/result/unet_2021-03-27_a
---state=./data/state/best_unet_2021-03-27_a.pth
+--prediction-dir=./data/result/unet_2021-03-30_a
+--state=./data/state/best_unet_2021-03-30_a.pth
 --model=unet
 --batch-size=6
---seed=23
+--seed=2300
 --width=512
 --height=512

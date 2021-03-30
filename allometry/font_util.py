@@ -1,10 +1,9 @@
 """Common functions for dealing with fonts."""
 
 from collections import namedtuple
+from itertools import cycle
 
 from allometry.const import FONTS_DIR
-
-from itertools import cycle
 
 AugmentParams = namedtuple('AugmentParams', 'font font_size filter snow_fract')
 
@@ -42,4 +41,4 @@ def choose_augment():
 
     snow_fract = params.get('snow_fract', 0.10)
 
-    return AugmentParams(font, font_size, filter_, snow_fract)
+    return AugmentParams(str(font), font_size, filter_, snow_fract)

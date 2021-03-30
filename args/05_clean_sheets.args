@@ -1,7 +1,7 @@
 --allometry-dir=./data/old/tables
 --clean-dir=./data/cleaned
---state=./data/state/best_autoencoder_2021-03-27_a.pth
---model=autoencoder
+--state=./data/state/best_unet_2021-03-30_a.pth
+--model=unet
 --width=512
 --height=512
 --rotate=270

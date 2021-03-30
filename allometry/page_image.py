@@ -5,10 +5,9 @@ from random import choice, randint, randrange
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-
-ABLATE_FRACT = 0.10
-ABLATE_LOW = 2
-ABLATE_HIGH = 4
+ABLATE_FRACT = 0.01
+ABLATE_LOW = 4
+ABLATE_HIGH = 8
 
 
 def y_image(data, font, font_size, width, height):
@@ -87,12 +86,15 @@ def x_snow_filter(image, snow_fract, image_filter):
 
 def ablate_pixels(image):
     """Remove blocks of pixels from the image."""
-    width, height = image.size
+    x = np.array(image).copy()
+    width, height = x.shape
+
     how_many = int(width * height * ABLATE_FRACT)
     for _ in range(how_many):
         w, h = randint(ABLATE_LOW, ABLATE_HIGH), randint(ABLATE_LOW, ABLATE_HIGH)
-        x0, y0 = randrange(width-w), randrange(height-h)
-        for x in range(x0, x0 + w):
-            for y in range(y0, y0 + h):
-                image[x, y] = 255
-    return image
+        x0, y0 = randrange(width - w), randrange(height - h)
+        x[x0:x0 + w, y0:y0 + h] = 255
+
+    x = Image.fromarray(x)
+    x = filter_image(x, 'median')
+    return x

@@ -6,12 +6,12 @@ import json
 import textwrap
 from os import makedirs
 from pathlib import Path
-from random import seed, random
+from random import seed
 
 from tqdm import tqdm
 
 from allometry.font_util import choose_augment
-from allometry.page_image import x_snow_filter, y_image, ablate_pixels
+from allometry.page_image import ablate_pixels, y_image
 
 WIDTH = 4500
 HEIGHT = 3440
@@ -30,14 +30,10 @@ def build_page(args, page):
     if args.y_dir:
         y.save(args.y_dir / name, 'JPEG')
 
-    # if random() < 0:
-    #     x = ablate_pixels(y)
-    # else:
-    #     x = x_snow_filter(y, aug.snow_fract, aug.filter)
     x = ablate_pixels(y)
     if args.x_dir:
-        x.save(args.x_dir / f'{Path(aug.font).stem}_{name}', 'JPEG')
-        # x.save(args.x_dir / name, 'JPEG')
+        # x.save(args.x_dir / f'{Path(aug.font).stem}_{name}', 'JPEG')
+        x.save(args.x_dir / name, 'JPEG')
 
 
 def make_dirs(args):

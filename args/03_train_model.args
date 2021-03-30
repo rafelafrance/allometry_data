@@ -3,9 +3,9 @@
 --state-dir=./data/state
 --runs-dir=./data/runs
 --epochs=200
---batch-size=6
+--batch-size=4
 --seed=364
---width=512
---height=512
+--width=768
+--height=768
 --model=unet
---suffix=a
+--suffix=b
