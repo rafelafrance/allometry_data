@@ -57,10 +57,10 @@ def batches(model, device, criterion, loader, prediction_dir):
     return losses
 
 
-def save_predictions(prediction_dir, x, y, pred, name):
-    """Save predictions for analysis"""
+def save_predictions(prediction_dir, x_s, y_s, preds, names):
+    """Save predictions for analysis."""
     if prediction_dir:
-        for x, y, pred, name in zip(x, y, pred, name):
+        for x, y, pred, name in zip(x_s, y_s, preds, names):
             path = join(prediction_dir, 'X', name)
             save_image(x, path)
 
