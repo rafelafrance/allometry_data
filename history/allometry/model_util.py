@@ -1,7 +1,7 @@
 """Common functions for training, testing, and running a model."""
 import torch
 
-from allometry.autoencoder import Autoencoder
+from history.allometry.autoencoder import Autoencoder
 
 
 def get_model(model_name):
