@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train a model."""
+"""Train a model to recognize digits on allometry sheets."""
 
 import argparse
 import logging
@@ -12,12 +12,12 @@ from random import seed
 import numpy as np
 import torch
 import torch.optim as optim
+from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from allometry.image_parts import ImageParts
-from allometry.metrics import BinaryDiceLoss
 from allometry.model_util import get_model, load_state
+from allometry.training_data import TrainingData
 from allometry.util import finished, started
 
 
@@ -41,7 +41,7 @@ def train(args):
     device = torch.device(args.device)
     model.to(device)
 
-    criterion = BinaryDiceLoss()
+    criterion = nn.CrossEntropyLoss()
 
     losses = []
     train_loader, valid_loader = get_loaders(args)
@@ -68,8 +68,7 @@ def train(args):
 def train_batches(model, device, criterion, losses, loader, optimizer):
     """Run the training phase of the epoch."""
     model.train()
-    for data in loader:
-        x, y, *_ = data
+    for x, y in loader:
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
         with torch.set_grad_enabled(True):
@@ -85,10 +84,9 @@ def valid_batches(model, device, criterion, losses, loader, seed_):
     model.eval()
 
     # Use the same validation images for each epoch i.e. same augmentations
-    rand_state = ImageParts.get_state(seed_)
+    rand_state = TrainingData.get_state(seed_)
 
-    for data in loader:
-        x, y, name = data
+    for x, y in loader:
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
             pred = model(x)
@@ -96,7 +94,30 @@ def valid_batches(model, device, criterion, losses, loader, seed_):
             losses.append(batch_loss.item())
 
     # Return to the current state of the training random number generator
-    ImageParts.set_state(rand_state)
+    TrainingData.set_state(rand_state)
+
+
+def get_loaders(args):
+    """Get the data loaders."""
+    train_dataset = TrainingData(args.train_size)
+    valid_dataset = TrainingData(args.valid_size)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True,
+        num_workers=args.workers,
+    )
+
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=args.batch_size,
+        drop_last=True,
+        num_workers=args.workers,
+    )
+
+    return train_loader, valid_loader
 
 
 def train_log(writer, losses, epoch):
@@ -130,34 +151,6 @@ def save_state(model, epoch, best_loss, avg_loss, name, state_dir):
     return best_loss
 
 
-def get_loaders(args):
-    """Get the data loaders."""
-    train_pairs = ImageParts.get_files(args.train_dir)
-    valid_pairs = ImageParts.get_files(args.valid_dir)
-
-    size = (args.height, args.width)
-
-    train_dataset = ImageParts(train_pairs, size=size)
-    valid_dataset = ImageParts(valid_pairs, size=size)
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_workers=args.workers,
-    )
-
-    valid_loader = DataLoader(
-        valid_dataset,
-        batch_size=args.batch_size,
-        drop_last=True,
-        num_workers=args.workers,
-    )
-
-    return train_loader, valid_loader
-
-
 def make_dirs(args):
     """Create output directories."""
     if args.state_dir:
@@ -168,18 +161,18 @@ def make_dirs(args):
 
 def parse_args():
     """Process command-line arguments."""
-    description = """Train a denoising autoencoder used to cleanup allometry sheets."""
+    description = """Train a model to recognize characters on allometry sheets."""
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--train-dir', '-T', required=True,
-        help="""Read training images from the X & Y subdirectories under this one.""")
+        '--train-size', '-t', type=int, default=4096,
+        help="""Training epoch size. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--valid-dir', '-V', required=True,
-        help="""Read validation images from the X & Y subdirectories under this one.""")
+        '--valid-size', '-v', type=int, default=512,
+        help="""Validation epoch size. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--state-dir', '-s', help="""Save best models to this directory.""")
@@ -194,7 +187,7 @@ def parse_args():
             availability of a GPU.""")
 
     arg_parser.add_argument(
-        '--model', '-m', choices=['autoencoder', 'unet'], default='autoencoder',
+        '--model', '-m', choices=['resnet50', 'resnet101'], default='resnet50',
         help="""What model architecture to use. (default: %(default)s)""")
 
     arg_parser.add_argument(
@@ -212,14 +205,6 @@ def parse_args():
     arg_parser.add_argument(
         '--batch-size', '-b', type=int, default=16,
         help="""Input batch size. (default: %(default)s)""")
-
-    arg_parser.add_argument(
-        '--width', '-W', type=int, default=512,
-        help="""Crop the images to this width. (default: %(default)s)""")
-
-    arg_parser.add_argument(
-        '--height', '-H', type=int, default=512,
-        help="""Crop the images to this height. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,

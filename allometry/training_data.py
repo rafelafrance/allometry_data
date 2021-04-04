@@ -1,7 +1,7 @@
 """Generate training data."""
 
 import string
-from random import choice, choices, randint
+from random import choice, choices, getstate, randint, seed, setstate
 
 import numpy as np
 import torch
@@ -9,48 +9,45 @@ import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from torch.utils.data import Dataset
 
-from allometry.const import FONTS, IMAGE_SIZE
+from allometry.const import CHARS, CHAR_TO_CLASS, FONTS, IMAGE_SIZE, OTHER_PUNCT, TINY_PUNCT
 
-
+# How to handle each font
 FONT_PARAMS = {
-    '1979_dot_matrix': {'high': 40},
-    'B612Mono-Bold': {'high': 48, 'filter': 'custom-median'},
-    'B612Mono-Regular': {'high': 48},
-    'CourierPrime-Bold': {'high': 48, 'filter': 'custom-median'},
-    'CourierPrime-BoldItalic': {'high': 48, 'filter': 'custom-median'},
-    'CourierPrime-Italic': {'high': 48},
-    'CourierPrime-Regular': {'high': 48},
-    'CutiveMono-Regular': {'high': 52},
-    'DOTMATRI': {'high': 54},
-    'DOTMBold': {'high': 48},
-    'DottyRegular-vZOy': {'high': 72},
-    'EHSMB': {'high': 48},
-    'ELEKTRA_': {'high': 54},
-    'Merchant Copy Doublesize': {'high': 44, 'filter': 'custom-median'},
-    'Merchant Copy Wide': {'high': 48},
-    'Merchant Copy': {'high': 72},
-    'Minecart_LCD': {'high': 48},
-    'OCRB_Medium': {'high': 48, 'filter': 'custom-median'},
-    'OCRB_Regular': {'high': 48, 'filter': 'custom-median'},
-    'OcrB2': {'high': 48, 'filter': 'custom-median'},
-    'Ordre de Départ': {'high': 48},
-    'RobotoMono-Italic-VariableFont_wght': {'high': 48, 'tiny': -4},
-    'RobotoMono-VariableFont_wght': {'high': 48, 'tiny': -4},
-    'SyneMono-Regular': {'high': 48},
-    'VT323-Regular': {'high': 54},
-    'XanhMono-Regular': {'high': 48},
-    'fake-receipt': {'high': 48},
-    'hydrogen': {'high': 54},
-    'scoreboard': {'high': 48},
+    '1979_dot_matrix': {'font_size_high': 40},
+    'B612Mono-Bold': {'font_size_high': 48, 'filter': 'custom-median'},
+    'B612Mono-Regular': {'font_size_high': 48},
+    'CourierPrime-Bold': {'font_size_high': 48, 'filter': 'custom-median'},
+    'CourierPrime-BoldItalic': {'font_size_high': 48, 'filter': 'custom-median'},
+    'CourierPrime-Italic': {'font_size_high': 48},
+    'CourierPrime-Regular': {'font_size_high': 48},
+    'CutiveMono-Regular': {'font_size_high': 52},
+    'DOTMATRI': {'font_size_high': 54},
+    'DOTMBold': {'font_size_high': 48},
+    'DottyRegular-vZOy': {'font_size_high': 72},
+    'EHSMB': {'font_size_high': 48},
+    'ELEKTRA_': {'font_size_high': 54},
+    'Merchant Copy Doublesize': {'font_size_high': 44, 'filter': 'custom-median'},
+    'Merchant Copy Wide': {'font_size_high': 48},
+    'Merchant Copy': {'font_size_high': 72},
+    'Minecart_LCD': {'font_size_high': 48},
+    'OCRB_Medium': {'font_size_high': 48, 'filter': 'custom-median'},
+    'OCRB_Regular': {'font_size_high': 48, 'filter': 'custom-median'},
+    'OcrB2': {'font_size_high': 48, 'filter': 'custom-median'},
+    'Ordre de Départ': {'font_size_high': 48},
+    'RobotoMono-Italic-VariableFont_wght': {'font_size_high': 48},
+    'RobotoMono-VariableFont_wght': {'font_size_high': 48},
+    'SyneMono-Regular': {'font_size_high': 48},
+    'VT323-Regular': {'font_size_high': 54},
+    'XanhMono-Regular': {'font_size_high': 48},
+    'fake-receipt': {'font_size_high': 48},
+    'hydrogen': {'font_size_high': 54},
+    'scoreboard': {'font_size_high': 48},
 }
 
-TINY_PUNCT = '.-,'
-OTHER_PUNCT = """$%*()<=>?+/;:^"""
-CHARS = list(string.digits + string.ascii_uppercase + TINY_PUNCT + OTHER_PUNCT)
-
-WEIGHTS = [10] * len(string.digits)
+# These are used for biasing the random select of characters
+WEIGHTS = [20] * len(string.digits)
 WEIGHTS += [5] * len(string.ascii_uppercase)
-WEIGHTS += [10] * len(TINY_PUNCT)
+WEIGHTS += [20] * len(TINY_PUNCT)
 WEIGHTS += [1] * len(OTHER_PUNCT)
 
 
@@ -64,6 +61,21 @@ class TrainingData(Dataset):
     def __len__(self):
         return self.length
 
+    @staticmethod
+    def get_state(seed_):
+        """Get the current random state so we can return to it later."""
+        rand_state = None
+        if seed_ is not None:
+            rand_state = getstate()
+            seed(seed_)
+        return rand_state
+
+    @staticmethod
+    def set_state(rand_state):
+        """Continue with an existing random number generator."""
+        if rand_state is not None:
+            setstate(rand_state)
+
     def __getitem__(self, _) -> torch.uint8:
         char = choices(CHARS, WEIGHTS)[0]
 
@@ -71,40 +83,34 @@ class TrainingData(Dataset):
 
         params = FONT_PARAMS.get(font_path.stem, {})
 
-        size_high = params.get('high', 40)
+        size_high = params.get('font_size_high', 40)
         size_low = size_high - 4
         font_size = randint(size_low, size_high)
-        snow = params.get('snow', 0.2)
-        filter_ = params.get('filter', 'median')
-        tiny = params.get('tiny', 0)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
         size = font.getsize_multiline(char)
 
-        left, top = 0, 0
-        if char in TINY_PUNCT:
-            left, top = tiny, tiny
-        else:
-            if size[0] < IMAGE_SIZE[0] - 1:
-                left = randint(1, (IMAGE_SIZE[0] - size[0] - 1))
-            if size[1] < IMAGE_SIZE[1] - 1:
-                top = randint(1, (IMAGE_SIZE[1] - size[1] - 1))
+        max_left = IMAGE_SIZE[0] - size[0]
+        left = randint(0, max_left) if max_left > 1 else 0
+
+        max_top = IMAGE_SIZE[1] - size[1]
+        top = randint(0, max_top) if max_top > 1 else 0
 
         image = Image.new('L', IMAGE_SIZE, color='black')
 
         draw = ImageDraw.Draw(image)
         draw.text((left, top), char, font=font, fill='white')
 
-        if snow:
-            image = add_snow(image, snow)
+        snow = 0.05 if char in TINY_PUNCT else 0.1
+        image = add_snow(image, snow)
 
-        if filter_:
-            image = filter_image(image, filter_)
+        filter_ = params.get('filter', 'median')
+        image = filter_image(image, filter_)
 
         image = image.point(lambda x: 255 if x > 128 else 0)
 
         data = TF.to_tensor(image)
-        return data
+        return data, CHAR_TO_CLASS[char]
 
 
 def custom_filter(image):

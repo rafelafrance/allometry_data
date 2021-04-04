@@ -1,0 +1,7 @@
+--state-dir=./data/state
+--runs-dir=./data/runs
+--suffix=b
+--batch-size=32
+--epochs=200
+--seed=364
+--model=resnet101

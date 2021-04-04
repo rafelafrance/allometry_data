@@ -46,7 +46,7 @@ class AllometrySheet(Dataset):
 
         box = self.chars[idx]
 
-        char = self.binary.crop(box.left, box.top, box.right, box.bottom)
+        char = self.binary.crop(box)
         width, height = char.size
 
         left = (IMAGE_SIZE[0] - width) // 2
@@ -55,7 +55,7 @@ class AllometrySheet(Dataset):
         image.paste(char, (left, top))
 
         data = TF.to_tensor(image)
-        return data
+        return data, box
 
     def find_rows(self) -> tuple[list[int], list[int]]:
         """Find rows in the image."""
@@ -67,7 +67,7 @@ class AllometrySheet(Dataset):
         """Find all characters in a line."""
         chars = []
         for top, bottom in zip(tops, bottoms):
-            row = self.binary.crop(0, top, self.width, bottom)
+            row = self.binary.crop((0, top, self.width, bottom))
 
             wheres = profile_projection(row, axis=0, threshold=self.col_threshold)
             lefts, rights = self.pairs(wheres)
