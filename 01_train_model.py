@@ -14,9 +14,8 @@ import torch
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
-from allometry.model_util import get_model, load_state
+from allometry.model_util import MODELS, get_model, load_state
 from allometry.training_data import TrainingData
 from allometry.util import finished, started
 
@@ -32,10 +31,8 @@ def train(args):
     name = f'{args.model}_{date.today().isoformat()}'
     name = f'{name}_{args.suffix}' if args.suffix else name
 
-    writer = SummaryWriter(args.runs_dir)
-
     model = get_model(args.model)
-    epoch_start = load_state(args.state, model)
+    epoch_start = load_state(args.state_dir, args.state, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
@@ -52,17 +49,15 @@ def train(args):
 
     for epoch in range(epoch_start, epoch_end):
         train_batches(model, device, criterion, losses, train_loader, optimizer)
-        msg = train_log(writer, losses, epoch)
+        msg = train_log(losses)
         losses = []
 
         valid_batches(model, device, criterion, losses, valid_loader, args.seed)
-        avg_loss = valid_log(writer, losses, epoch, msg, best_loss)
+        avg_loss = valid_log(losses, epoch, msg, best_loss)
         losses = []
 
-        best_loss = save_state(model, epoch, best_loss, avg_loss, name, args.state_dir)
-
-    writer.flush()
-    writer.close()
+        best_loss = save_state(
+            model, epoch, best_loss, avg_loss, name, args.state_dir, args.save_modulo)
 
 
 def train_batches(model, device, criterion, losses, loader, optimizer):
@@ -120,24 +115,21 @@ def get_loaders(args):
     return train_loader, valid_loader
 
 
-def train_log(writer, losses, epoch):
+def train_log(losses):
     """Clean up after the training epoch."""
     avg_loss = np.mean(losses)
-    writer.add_scalar("Loss/train", avg_loss, epoch)
     return f'training {avg_loss:0.6f}'
 
 
-def valid_log(writer, losses, epoch, msg, best_loss):
+def valid_log(losses, epoch, msg, best_loss):
     """Clean up after the validation epoch."""
     avg_loss = np.mean(losses)
     flag = '*' if avg_loss < best_loss else ''
-    writer.add_scalar("Loss/valid", avg_loss, epoch)
-    logging.info(
-        f'Epoch: {epoch: 3d} Average loss {msg} validation {avg_loss:0.6f} {flag}')
+    logging.info(f'Epoch: {epoch: 3d} Loss {msg} validation {avg_loss:0.6f} {flag}')
     return avg_loss
 
 
-def save_state(model, epoch, best_loss, avg_loss, name, state_dir):
+def save_state(model, epoch, best_loss, avg_loss, name, state_dir, save_modulo):
     """Save the model if the current validation score is better than the best one."""
     # TODO save optimizer too
     model.state_dict()['epoch'] = epoch
@@ -147,6 +139,10 @@ def save_state(model, epoch, best_loss, avg_loss, name, state_dir):
         path = state_dir / f'best_{name}.pth'
         torch.save(model.state_dict(), path)
         best_loss = avg_loss
+
+    if save_modulo:
+        path = state_dir / f'last_{name}_modulo_{epoch % save_modulo}.pth'
+        torch.save(model.state_dict(), path)
 
     return best_loss
 
@@ -187,7 +183,7 @@ def parse_args():
             availability of a GPU.""")
 
     arg_parser.add_argument(
-        '--model', '-m', choices=['resnet50', 'resnet101'], default='resnet50',
+        '--model', '-m', default='resnet50', choices=list(MODELS.keys()),
         help="""What model architecture to use. (default: %(default)s)""")
 
     arg_parser.add_argument(
@@ -205,6 +201,10 @@ def parse_args():
     arg_parser.add_argument(
         '--batch-size', '-b', type=int, default=16,
         help="""Input batch size. (default: %(default)s)""")
+
+    arg_parser.add_argument(
+        '--save-modulo', '-M', type=int,
+        help="""Save models from the last modulo M iterations.""")
 
     arg_parser.add_argument(
         '--workers', '-w', type=int, default=4,

@@ -9,10 +9,9 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
 
-from allometry.const import IMAGE_SIZE
+from allometry.const import BBox, ImageSize, CHAR_IMAGE
 
 Where = namedtuple('Where', 'line type')
-BBox = namedtuple('BBox', 'left top right bottom')
 
 
 class AllometrySheet(Dataset):
@@ -22,6 +21,7 @@ class AllometrySheet(Dataset):
     bin_threshold = 230  # Threshold for converting the image to binary
     row_threshold = 20  # Max number of pixels for a row to be empty
     col_threshold = 0  # Max number of pixels for a column to be empty
+    box_width = 15  # A box must be this wide to be considered a character
 
     def __init__(self, path: Path, rotate: int = 0):
         self.path = path  # Path to the image
@@ -33,7 +33,7 @@ class AllometrySheet(Dataset):
             self.image = self.image.rotate(rotate, expand=True, fillcolor='white')
 
         self.binary = self.image.point(lambda x: 255 if x < self.bin_threshold else 0)
-        self.width, self.height = self.binary.size
+        self.page_image = ImageSize(self.binary.size[0], self.binary.size[1])
 
         tops, bottoms = self.find_rows()
         self.chars: list[BBox] = self.find_chars(tops, bottoms)
@@ -42,20 +42,25 @@ class AllometrySheet(Dataset):
         return len(self.chars)
 
     def __getitem__(self, idx: int) -> torch.uint8:
-        image = Image.new('L', IMAGE_SIZE, color='black')
+        image, box = self.char_image(idx)
+        data = TF.to_tensor(image)
+        return data, box
+
+    def char_image(self, idx):
+        """Crop the character into its own image."""
+        image = Image.new('L', CHAR_IMAGE, color='black')
 
         box = self.chars[idx]
 
-        char = self.binary.crop(box)
-        width, height = char.size
+        cropped = self.binary.crop(box)
+        char_size = ImageSize(cropped.size[0], cropped.size[1])
 
-        left = (IMAGE_SIZE[0] - width) // 2
-        top = (IMAGE_SIZE[1] - height) // 2
+        left = (CHAR_IMAGE.width - char_size.width) // 2
+        top = (CHAR_IMAGE.height - char_size.height) // 2
 
-        image.paste(char, (left, top))
+        image.paste(cropped, (left, top))
 
-        data = TF.to_tensor(image)
-        return data, box
+        return image, box
 
     def find_rows(self) -> tuple[list[int], list[int]]:
         """Find rows in the image."""
@@ -67,12 +72,13 @@ class AllometrySheet(Dataset):
         """Find all characters in a line."""
         chars = []
         for top, bottom in zip(tops, bottoms):
-            row = self.binary.crop((0, top, self.width, bottom))
+            row = self.binary.crop((0, top, self.page_image.width, bottom))
 
             wheres = profile_projection(row, axis=0, threshold=self.col_threshold)
             lefts, rights = self.pairs(wheres)
 
             boxes = merge_boxes(lefts, rights, top, bottom)
+            boxes = [b for b in boxes if b.right - b.left >= self.box_width]
             chars.extend(boxes)
 
         return chars
@@ -108,7 +114,7 @@ def profile_projection(bin_section, threshold=20, axis=1) -> list[Where]:
     return where
 
 
-def merge_boxes(lefts, rights, top, bottom, inside=4, outside=30) -> list[BBox]:
+def merge_boxes(lefts, rights, top, bottom, inside=4, outside=40) -> list[BBox]:
     """Merge character boxes that are near to each other.
 
     We are finding boxes around each character. However, there are a lot of missing

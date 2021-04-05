@@ -9,50 +9,38 @@ import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from torch.utils.data import Dataset
 
-from allometry.const import CHARS, CHAR_TO_CLASS, FONTS, IMAGE_SIZE, OTHER_PUNCT, TINY_PUNCT
-
-# How to handle each font
-FONT_PARAMS = {
-    '1979_dot_matrix': {'font_size_high': 40},
-    'B612Mono-Bold': {'font_size_high': 48, 'filter': 'custom-median'},
-    'B612Mono-Regular': {'font_size_high': 48},
-    'CourierPrime-Bold': {'font_size_high': 48, 'filter': 'custom-median'},
-    'CourierPrime-BoldItalic': {'font_size_high': 48, 'filter': 'custom-median'},
-    'CourierPrime-Italic': {'font_size_high': 48},
-    'CourierPrime-Regular': {'font_size_high': 48},
-    'CutiveMono-Regular': {'font_size_high': 52},
-    'DOTMATRI': {'font_size_high': 54},
-    'DOTMBold': {'font_size_high': 48},
-    'DottyRegular-vZOy': {'font_size_high': 72},
-    'EHSMB': {'font_size_high': 48},
-    'ELEKTRA_': {'font_size_high': 54},
-    'Merchant Copy Doublesize': {'font_size_high': 44, 'filter': 'custom-median'},
-    'Merchant Copy Wide': {'font_size_high': 48},
-    'Merchant Copy': {'font_size_high': 72},
-    'Minecart_LCD': {'font_size_high': 48},
-    'OCRB_Medium': {'font_size_high': 48, 'filter': 'custom-median'},
-    'OCRB_Regular': {'font_size_high': 48, 'filter': 'custom-median'},
-    'OcrB2': {'font_size_high': 48, 'filter': 'custom-median'},
-    'Ordre de Départ': {'font_size_high': 48},
-    'RobotoMono-Italic-VariableFont_wght': {'font_size_high': 48},
-    'RobotoMono-VariableFont_wght': {'font_size_high': 48},
-    'SyneMono-Regular': {'font_size_high': 48},
-    'VT323-Regular': {'font_size_high': 54},
-    'XanhMono-Regular': {'font_size_high': 48},
-    'fake-receipt': {'font_size_high': 48},
-    'hydrogen': {'font_size_high': 54},
-    'scoreboard': {'font_size_high': 48},
-}
-
-# These are used for biasing the random select of characters
-WEIGHTS = [20] * len(string.digits)
-WEIGHTS += [5] * len(string.ascii_uppercase)
-WEIGHTS += [20] * len(TINY_PUNCT)
-WEIGHTS += [1] * len(OTHER_PUNCT)
+from allometry.const import (CHARS, CHAR_IMAGE, CHAR_TO_CLASS, FONTS, ImageSize,
+                             OTHER_PUNCT, POINTS_TO_PIXELS, TINY_PUNCT)
 
 
 class TrainingData(Dataset):
     """Generate augmented training data."""
+
+    # How to handle each font
+    font_params = {
+        '1979_dot_matrix': {},
+        'B612Mono-Bold': {'filter': 'custom-median'},
+        'B612Mono-Regular': {},
+        'CourierPrime-Bold': {'pt': 48, 'filter': 'custom-median'},
+        'CourierPrime-Regular': {'pt': 48},
+        'DOTMATRI': {},
+        'DottyRegular-vZOy': {'pt': 72},
+        'EHSMB': {},
+        'ELEKTRA_': {'pt': 48},
+        'Merchant Copy Doublesize': {'filter': 'custom-median'},
+        'Merchant Copy': {'pt': 72},
+        'OCRB_Medium': {'filter': 'custom-median'},
+        'OCRB_Regular': {'filter': 'custom-median'},
+        'Ordre de Départ': {},
+        'RobotoMono-VariableFont_wght': {},
+        'hydrogen': {'pt': 52},
+        'scoreboard': {'pt': 52},
+    }
+    # These are used for biasing the random select of characters
+    weights = [20] * len(string.digits)
+    weights += [5] * len(string.ascii_uppercase)
+    weights += [20] * len(TINY_PUNCT)
+    weights += [1] * len(OTHER_PUNCT)
 
     def __init__(self, length):
         """Generate a dataset using pairs of images."""
@@ -77,40 +65,46 @@ class TrainingData(Dataset):
             setstate(rand_state)
 
     def __getitem__(self, _) -> torch.uint8:
-        char = choices(CHARS, WEIGHTS)[0]
+        # char = choice(CHARS)
+        char = choices(CHARS, self.weights)[0]
 
+        image = self.char_image(char)
+
+        data = TF.to_tensor(image)
+        return data, CHAR_TO_CLASS[char]
+
+    def char_image(self, char):
+        """Draw an image of the character."""
         font_path = choice(FONTS)
 
-        params = FONT_PARAMS.get(font_path.stem, {})
+        params = self.font_params.get(font_path.stem, {})
 
-        size_high = params.get('font_size_high', 40)
-        size_low = size_high - 4
+        size_high = params.get('pt', int(CHAR_IMAGE.width * POINTS_TO_PIXELS))
+        size_low = size_high - 2
         font_size = randint(size_low, size_high)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
         size = font.getsize_multiline(char)
+        size = ImageSize(size[0], size[1])
 
-        max_left = IMAGE_SIZE[0] - size[0]
-        left = randint(0, max_left) if max_left > 1 else 0
+        image = Image.new('L', CHAR_IMAGE, color='black')
 
-        max_top = IMAGE_SIZE[1] - size[1]
-        top = randint(0, max_top) if max_top > 1 else 0
+        left = (CHAR_IMAGE.width - size.width) // 2
+        left = left if left > 0 else 0
 
-        image = Image.new('L', IMAGE_SIZE, color='black')
+        top = (CHAR_IMAGE.height - size.height) // 2
+        top = top if top > 0 else 0
 
         draw = ImageDraw.Draw(image)
         draw.text((left, top), char, font=font, fill='white')
 
-        snow = 0.05 if char in TINY_PUNCT else 0.1
-        image = add_snow(image, snow)
-
+        image = add_soot(image, 0.2)
         filter_ = params.get('filter', 'median')
-        image = filter_image(image, filter_)
 
+        image = filter_image(image, filter_)
         image = image.point(lambda x: 255 if x > 128 else 0)
 
-        data = TF.to_tensor(image)
-        return data, CHAR_TO_CLASS[char]
+        return image
 
 
 def custom_filter(image):
@@ -141,8 +135,8 @@ def filter_image(image, image_filter):
     return image
 
 
-def add_snow(image, fract=0.1):
-    """Add snow (soot) to the image."""
+def add_soot(image, fract=0.1):
+    """Add soot (black pixels) to the image."""
     data = np.array(image).copy()
 
     shape = data.shape

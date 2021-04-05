@@ -1,7 +1,9 @@
---state-dir=./data/state
 --runs-dir=./data/runs
+--state-dir=./data/state
+--state=best_resnet34_2021-04-04_a.pth
 --suffix=b
 --batch-size=32
---epochs=200
---seed=364
---model=resnet101
+--epochs=300
+--model=resnet34
+--learning-rate=0.001
+--seed=3640
