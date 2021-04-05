@@ -9,15 +9,14 @@ from os import makedirs
 from pathlib import Path
 from random import seed
 
-import numpy as np
 import torch
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
-from allometry.model_util import MODELS, get_model, load_state
+from allometry.model_util import MODELS, get_model, load_model_state
 from allometry.training_data import TrainingData
-from allometry.util import finished, started
+from allometry.util import Score, finished, started
 
 
 def train(args):
@@ -28,11 +27,11 @@ def train(args):
         torch.manual_seed(args.seed)
         seed(args.seed)
 
-    name = f'{args.model}_{date.today().isoformat()}'
+    name = f'{args.model_arch}_{date.today().isoformat()}'
     name = f'{name}_{args.suffix}' if args.suffix else name
 
-    model = get_model(args.model)
-    epoch_start = load_state(args.state_dir, args.state, model)
+    model = get_model(args.model_arch)
+    epoch_start = load_model_state(args.model_dir, args.model_state, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
@@ -40,62 +39,84 @@ def train(args):
 
     criterion = nn.CrossEntropyLoss()
 
-    losses = []
-    train_loader, valid_loader = get_loaders(args)
+    train_loader, score_loader = get_loaders(args)
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    best_loss = 9999.9
+    best_score = Score
 
     for epoch in range(epoch_start, epoch_end):
-        train_batches(model, device, criterion, losses, train_loader, optimizer)
-        msg = train_log(losses)
-        losses = []
+        score = Score()
 
-        valid_batches(model, device, criterion, losses, valid_loader, args.seed)
-        avg_loss = valid_log(losses, epoch, msg, best_loss)
-        losses = []
+        train_batches(model, device, criterion, train_loader, optimizer, score)
+        score_batches(model, device, criterion, score_loader, args.seed, score)
 
-        best_loss = save_state(
-            model, epoch, best_loss, avg_loss, name, args.state_dir, args.save_modulo)
+        log_score(score, best_score, epoch)
+        best_score = save_state(model, args.model_dir, name, epoch, score, best_score)
 
 
-def train_batches(model, device, criterion, losses, loader, optimizer):
+def train_batches(model, device, criterion, loader, optimizer, score):
     """Run the training phase of the epoch."""
     model.train()
+
     for x, y in loader:
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
         with torch.set_grad_enabled(True):
             pred = model(x)
-            batch_loss = criterion(pred, y)
-            losses.append(batch_loss.item())
-            batch_loss.backward()
+            loss = criterion(pred, y)
+            score.train_losses.append(loss.item())
+            loss.backward()
             optimizer.step()
 
 
-def valid_batches(model, device, criterion, losses, loader, seed_):
+def score_batches(model, device, criterion, loader, seed_, score):
     """Run the validating phase of the epoch."""
-    model.eval()
-
-    # Use the same validation images for each epoch i.e. same augmentations
+    # Use the same images for scoring i.e. same augmentations
     rand_state = TrainingData.get_state(seed_)
+
+    model.eval()
 
     for x, y in loader:
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
             pred = model(x)
-            batch_loss = criterion(pred, y)
-            losses.append(batch_loss.item())
+            loss = criterion(pred, y)
+            _, idx = torch.max(pred.data, 1)
+            score.score_losses.append(loss.item())
+            score.total.append(y.size(0))
+            score.correct_1.append((idx == y).sum().item())
 
     # Return to the current state of the training random number generator
     TrainingData.set_state(rand_state)
 
 
+def log_score(score, best_score, epoch):
+    """Clean up after the scoring epoch."""
+    flag = '*' if score.better_than(best_score) else ''
+
+    logging.info(f'Epoch: {epoch:3d} Average loss '
+                 f'(train: {score.avg_train_loss:0.8f},'
+                 f' score: {score.avg_score_loss:0.8f}) '
+                 f'Accuracy: {score.top_1:12.8f} % {flag}')
+
+
+def save_state(model, model_dir, name, epoch, score, best_score):
+    """Save the model if the current score is better than the best one."""
+    model.state_dict()['epoch'] = epoch
+
+    if score.better_than(best_score):
+        path = model_dir / f'best_{name}.pth'
+        torch.save(model.state_dict(), path)
+        best_score = score
+
+    return best_score
+
+
 def get_loaders(args):
     """Get the data loaders."""
     train_dataset = TrainingData(args.train_size)
-    valid_dataset = TrainingData(args.valid_size)
+    score_dataset = TrainingData(args.score_size)
 
     train_loader = DataLoader(
         train_dataset,
@@ -105,54 +126,22 @@ def get_loaders(args):
         num_workers=args.workers,
     )
 
-    valid_loader = DataLoader(
-        valid_dataset,
+    score_loader = DataLoader(
+        score_dataset,
         batch_size=args.batch_size,
         drop_last=True,
         num_workers=args.workers,
     )
 
-    return train_loader, valid_loader
-
-
-def train_log(losses):
-    """Clean up after the training epoch."""
-    avg_loss = np.mean(losses)
-    return f'training {avg_loss:0.8f}'
-
-
-def valid_log(losses, epoch, msg, best_loss):
-    """Clean up after the validation epoch."""
-    avg_loss = np.mean(losses)
-    flag = '*' if avg_loss < best_loss else ''
-    logging.info(f'Epoch: {epoch:3d} Loss {msg} validation {avg_loss:0.8f} {flag}')
-    return avg_loss
-
-
-def save_state(model, epoch, best_loss, avg_loss, name, state_dir, save_modulo):
-    """Save the model if the current validation score is better than the best one."""
-    # TODO save optimizer too
-    model.state_dict()['epoch'] = epoch
-    model.state_dict()['avg_loss'] = avg_loss
-
-    if avg_loss < best_loss:
-        path = state_dir / f'best_{name}.pth'
-        torch.save(model.state_dict(), path)
-        best_loss = avg_loss
-
-    if save_modulo:
-        path = state_dir / f'last_{name}_modulo_{epoch % save_modulo}.pth'
-        torch.save(model.state_dict(), path)
-
-    return best_loss
+    return train_loader, score_loader
 
 
 def make_dirs(args):
     """Create output directories."""
-    if args.state_dir:
-        makedirs(args.state_dir, exist_ok=True)
-    if args.runs_dir:
-        makedirs(args.runs_dir, exist_ok=True)
+    if args.model_dir:
+        makedirs(args.model_dir, exist_ok=True)
+    # if args.runs_dir:
+    #     makedirs(args.runs_dir, exist_ok=True)
 
 
 def parse_args():
@@ -163,66 +152,63 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--train-size', '-t', type=int, default=4096,
-        help="""Training epoch size. (default: %(default)s)""")
+        '--train-size', type=int, default=4096,
+        help="""Train this many characters per epoch. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--valid-size', '-v', type=int, default=512,
-        help="""Validation epoch size. (default: %(default)s)""")
+        '--score-size', type=int, default=512,
+        help="""Train this many characters per epoch. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--state-dir', '-s', help="""Save best models to this directory.""")
+        '--model-dir', type=Path, help="""Save models to this directory.""")
 
     arg_parser.add_argument(
-        '--runs-dir', '-R', help="""Save tensor board logs to this directory.""")
+        '--model-state',
+        help="""Load this model state to continue training the model. The file must
+            be in the --model-dir.""")
 
     arg_parser.add_argument(
-        '--device', '-d',
-        help="""Which GPU or CPU to use. Options are 'cpu', 'cuda:0', 'cuda:1' etc.
-            We'll try to default to either 'cpu' or 'cuda:0' depending on the
-            availability of a GPU.""")
-
-    arg_parser.add_argument(
-        '--model', '-m', default='resnet50', choices=list(MODELS.keys()),
+        '--model-arch', default='resnet50', choices=list(MODELS.keys()),
         help="""What model architecture to use. (default: %(default)s)""")
 
     arg_parser.add_argument(
         '--suffix',
-        help="""Add this to the model name to differentiate it from other runs.""")
+        help="""Add this to the saved model name to differentiate it from
+            other runs.""")
+
+    default = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    arg_parser.add_argument(
+        '--device', default=default,
+        help="""Which GPU or CPU to use. Options are 'cpu', 'cuda:0', 'cuda:1' etc.
+            (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--epochs', '-e', type=int, default=100,
+        '--epochs', type=int, default=100,
         help="""How many epochs to train. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--learning-rate', '--lr', '-l', type=float, default=0.0001,
+        '--learning-rate', type=float, default=0.0001,
         help="""Initial learning rate. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--batch-size', '-b', type=int, default=16,
+        '--batch-size', type=int, default=16,
         help="""Input batch size. (default: %(default)s)""")
 
-    arg_parser.add_argument(
-        '--save-modulo', '-M', type=int,
-        help="""Save models from the last modulo M iterations.""")
+    # arg_parser.add_argument(
+    #     '--top-k', type=int, default=5,
+    #     help="""Get the top K predictions. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--workers', '-w', type=int, default=4,
+        '--workers', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--state', '-L', help="""Load this state dict to restart the model.""")
+        '--seed', type=int, help="""Create a random seed.""")
 
-    arg_parser.add_argument(
-        '--seed', '-S', type=int, help="""Create a random seed.""")
+    # arg_parser.add_argument(
+    #     '--runs-dir', help="""Save tensor board logs to this directory.""")
 
     args = arg_parser.parse_args()
-
-    if args.state_dir:
-        args.state_dir = Path(args.state_dir)
-
-    if not args.device:
-        args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     return args
 

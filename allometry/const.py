@@ -16,7 +16,7 @@ TEXT_DIR = DATA_DIR / 'text'
 FONTS_DIR = ROOT_DIR / 'fonts'
 FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
 
-CHAR_IMAGE = ImageSize(32, 48)
+CHAR_IMAGE_SIZE = ImageSize(32, 48)
 
 TINY_PUNCT = '.-,'
 # OTHER_PUNCT = """$%*()<=>?+/;:^"""

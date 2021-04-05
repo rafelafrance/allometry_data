@@ -17,11 +17,11 @@ MODELS = {
 }
 
 
-def load_state(state_dir, state, model):
+def load_model_state(model_dir, model_state, model):
     """Load a saved model."""
     start = 1
-    if state:
-        path = state_dir / state
+    if model_state:
+        path = model_dir / model_state
         state = torch.load(path)
         model.load_state_dict(state)
         if model.state_dict().get('epoch'):
@@ -29,11 +29,11 @@ def load_state(state_dir, state, model):
     return start
 
 
-def get_model(model_name):
+def get_model(model_arch):
     """Get the model to use."""
-    model = MODELS[model_name]()
+    model = MODELS[model_arch]()
 
-    if model_name.startswith('resne'):
+    if model_arch.startswith('resne'):
         model.conv1 = nn.Conv2d(
             1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         model.fc = nn.Linear(model.fc.in_features, len(CHARS))

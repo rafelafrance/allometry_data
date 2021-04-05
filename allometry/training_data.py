@@ -9,7 +9,7 @@ import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from torch.utils.data import Dataset
 
-from allometry.const import (CHARS, CHAR_IMAGE, CHAR_TO_CLASS, FONTS, ImageSize,
+from allometry.const import (CHARS, CHAR_IMAGE_SIZE, CHAR_TO_CLASS, FONTS, ImageSize,
                              OTHER_PUNCT, POINTS_TO_PIXELS, TINY_PUNCT)
 
 
@@ -20,22 +20,12 @@ class TrainingData(Dataset):
     font_params = {
         '1979_dot_matrix': {'.': '.•'},
         'B612Mono-Bold': {'.': '.•●'},
-        'B612Mono-Regular': {'.': '.·●'},
         'CourierPrime-Bold': {'pt': 48, '.': '.••'},
-        'CourierPrime-Regular': {'pt': 48, '.': '.••'},
         'FiraMono-Bold': {'.': '.·•∙●'},
-        'FiraMono-Medium': {'.': '.·•∙●'},
-        'FiraMono-Regular': {'.': '.·•∙●'},
         'IBMPlexMono-Bold': {'.': '.·•'},
-        'IBMPlexMono-Medium': {'.': '.·•'},
-        'IBMPlexMono-SemiBold': {'.': '.·•'},
         'OverpassMono-Bold': {'.': '.·•●'},
-        'RobotoMono-VariableFont_wght': {'.': '.·•'},
         'SourceCodePro-Black': {'.': '.·∙●'},
         'SourceCodePro-Bold': {'.': '.·∙●'},
-        'SourceCodePro-Medium': {'.': '.·∙●'},
-        'SourceCodePro-Regular': {'.': '.·∙●'},
-        'SourceCodePro-SemiBold': {'.': '.·∙●'},
         'SpaceMono-Bold': {'.': '.·•'},
         'Merchant Copy Doublesize': {},
     }
@@ -52,6 +42,52 @@ class TrainingData(Dataset):
     def __len__(self):
         return self.length
 
+    def __getitem__(self, _) -> torch.uint8:
+        # char = choice(CHARS)
+        char = choices(CHARS, self.weights)[0]
+        font_path = choice(FONTS)
+
+        image = self.char_image(char, font_path)
+
+        data = TF.to_tensor(image)
+        return data, CHAR_TO_CLASS[char]
+
+    def char_image(self, char, font_path, soot_fract=0.075, filter_='custom-min'):
+        """Draw an image of the character."""
+        params = self.font_params.get(font_path.stem, {})
+
+        tweak = 0  # self.char_tweak.get(char, 0)
+        chars = params.get(char, char)
+        char = chars[-1]
+
+        size_high = params.get('pt', int(CHAR_IMAGE_SIZE.width * POINTS_TO_PIXELS))
+        size_low = size_high - 2
+        font_size = randint(size_low, size_high)
+
+        font = ImageFont.truetype(str(font_path), size=font_size)
+        size = font.getsize(char)
+        size = ImageSize(size[0], size[1])
+
+        image = Image.new('L', CHAR_IMAGE_SIZE, color='black')
+
+        left = (CHAR_IMAGE_SIZE.width - size.width) // 2
+        left = left if left > 0 else 0
+
+        top = (CHAR_IMAGE_SIZE.height - size.height) // 2
+        top = top if top > 0 else -tweak
+
+        draw = ImageDraw.Draw(image)
+        draw.text((left, top), char, font=font, fill='white')
+
+        image = add_soot(image, soot_fract)
+
+        filter_ = params.get('filter', filter_)
+        image = filter_image(image, filter_)
+
+        image = image.point(lambda x: 255 if x > 128 else 0)
+
+        return image
+
     @staticmethod
     def get_state(seed_):
         """Get the current random state so we can return to it later."""
@@ -66,52 +102,6 @@ class TrainingData(Dataset):
         """Continue with an existing random number generator."""
         if rand_state is not None:
             setstate(rand_state)
-
-    def __getitem__(self, _) -> torch.uint8:
-        # char = choice(CHARS)
-        char = choices(CHARS, self.weights)[0]
-        font_path = choice(FONTS)
-
-        image = self.char_image(char, font_path)
-
-        data = TF.to_tensor(image)
-        return data, CHAR_TO_CLASS[char]
-
-    def char_image(self, char, font_path):
-        """Draw an image of the character."""
-        params = self.font_params.get(font_path.stem, {})
-
-        tweak = 0  # self.char_tweak.get(char, 0)
-        chars = params.get(char, char)
-        char = chars[-1]
-
-        size_high = params.get('pt', int(CHAR_IMAGE.width * POINTS_TO_PIXELS))
-        size_low = size_high - 2
-        font_size = randint(size_low, size_high)
-
-        font = ImageFont.truetype(str(font_path), size=font_size)
-        size = font.getsize(char)
-        size = ImageSize(size[0], size[1])
-
-        image = Image.new('L', CHAR_IMAGE, color='black')
-
-        left = (CHAR_IMAGE.width - size.width) // 2
-        left = left if left > 0 else 0
-
-        top = (CHAR_IMAGE.height - size.height) // 2
-        top = top if top > 0 else -tweak
-
-        draw = ImageDraw.Draw(image)
-        draw.text((left, top), char, font=font, fill='white')
-
-        image = add_soot(image, 0.25)
-
-        filter_ = params.get('filter', 'custom-median')
-        image = filter_image(image, filter_)
-
-        image = image.point(lambda x: 255 if x > 128 else 0)
-
-        return image
 
 
 def custom_filter(image):

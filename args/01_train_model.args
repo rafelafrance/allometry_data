@@ -1,9 +1,9 @@
---runs-dir=./data/runs
---state-dir=./data/state
---state=best_resnext101_2021-04-05_b.pth
---suffix=c
+--model-dir=./data/model
+--model-state=best_resnext101_2021-04-05_e.pth
+--model-arch=resnext101
+--suffix=f
 --batch-size=32
 --epochs=300
---model=resnext101
 --learning-rate=0.0001
---seed=3641
+--seed=3644
+--score-size=1000

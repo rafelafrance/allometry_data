@@ -9,7 +9,7 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
 
-from allometry.const import BBox, ImageSize, CHAR_IMAGE
+from allometry.const import BBox, CHAR_IMAGE_SIZE, ImageSize
 
 Where = namedtuple('Where', 'line type')
 
@@ -19,8 +19,8 @@ class AllometrySheet(Dataset):
 
     padding = 1  # How much space around each character
     bin_threshold = 230  # Threshold for converting the image to binary
-    row_threshold = 20  # Max number of pixels for a row to be empty
-    col_threshold = 0  # Max number of pixels for a column to be empty
+    row_threshold = 20  # Max number of pixels for a row to be considered empty
+    col_threshold = 0  # Max number of pixels for a column to be considered empty
     box_width = 15  # A box must be this wide to be considered a character
 
     def __init__(self, path: Path, rotate: int = 0):
@@ -52,15 +52,15 @@ class AllometrySheet(Dataset):
 
     def char_image(self, idx):
         """Crop the character into its own image."""
-        image = Image.new('L', CHAR_IMAGE, color='black')
+        image = Image.new('L', CHAR_IMAGE_SIZE, color='black')
 
         box = self.chars[idx]
 
         cropped = self.binary.crop(box)
-        char_size = ImageSize(cropped.size[0], cropped.size[1])
 
-        left = (CHAR_IMAGE.width - char_size.width) // 2
-        top = (CHAR_IMAGE.height - char_size.height) // 2
+        # Put the character into the middle of the image
+        left = (CHAR_IMAGE_SIZE.width - cropped.size[0]) // 2
+        top = (CHAR_IMAGE_SIZE.height - cropped.size[1]) // 2
 
         image.paste(cropped, (left, top))
 
