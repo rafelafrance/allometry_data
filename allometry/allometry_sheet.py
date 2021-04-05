@@ -35,8 +35,7 @@ class AllometrySheet(Dataset):
         self.binary = self.image.point(lambda x: 255 if x < self.bin_threshold else 0)
         self.page_image = ImageSize(self.binary.size[0], self.binary.size[1])
 
-        tops, bottoms = self.find_rows()
-        self.chars: list[BBox] = self.find_chars(tops, bottoms)
+        self.chars: list[BBox] = self.dissect_sheet()
 
     def __len__(self) -> int:
         return len(self.chars)
@@ -45,6 +44,11 @@ class AllometrySheet(Dataset):
         image, box = self.char_image(idx)
         data = TF.to_tensor(image)
         return data, box
+
+    def dissect_sheet(self):
+        """Find the characters in an allometry sheet."""
+        tops, bottoms = self.find_rows()
+        return self.find_chars(tops, bottoms)
 
     def char_image(self, idx):
         """Crop the character into its own image."""

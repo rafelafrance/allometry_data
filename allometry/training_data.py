@@ -18,28 +18,31 @@ class TrainingData(Dataset):
 
     # How to handle each font
     font_params = {
-        '1979_dot_matrix': {},
-        'B612Mono-Bold': {'filter': 'custom-median'},
-        'B612Mono-Regular': {},
-        'CourierPrime-Bold': {'pt': 48, 'filter': 'custom-median'},
-        'CourierPrime-Regular': {'pt': 48},
-        'DOTMATRI': {},
-        'DottyRegular-vZOy': {'pt': 72},
-        'EHSMB': {},
-        'ELEKTRA_': {'pt': 48},
-        'Merchant Copy Doublesize': {'filter': 'custom-median'},
-        'Merchant Copy': {'pt': 72},
-        'OCRB_Medium': {'filter': 'custom-median'},
-        'OCRB_Regular': {'filter': 'custom-median'},
-        'Ordre de Départ': {},
-        'RobotoMono-VariableFont_wght': {},
-        'hydrogen': {'pt': 52},
-        'scoreboard': {'pt': 52},
+        '1979_dot_matrix': {'.': '.•'},
+        'B612Mono-Bold': {'.': '.•●'},
+        'B612Mono-Regular': {'.': '.·●'},
+        'CourierPrime-Bold': {'pt': 48, '.': '.••'},
+        'CourierPrime-Regular': {'pt': 48, '.': '.••'},
+        'FiraMono-Bold': {'.': '.·•∙●'},
+        'FiraMono-Medium': {'.': '.·•∙●'},
+        'FiraMono-Regular': {'.': '.·•∙●'},
+        'IBMPlexMono-Bold': {'.': '.·•'},
+        'IBMPlexMono-Medium': {'.': '.·•'},
+        'IBMPlexMono-SemiBold': {'.': '.·•'},
+        'OverpassMono-Bold': {'.': '.·•●'},
+        'RobotoMono-VariableFont_wght': {'.': '.·•'},
+        'SourceCodePro-Black': {'.': '.·∙●'},
+        'SourceCodePro-Bold': {'.': '.·∙●'},
+        'SourceCodePro-Medium': {'.': '.·∙●'},
+        'SourceCodePro-Regular': {'.': '.·∙●'},
+        'SourceCodePro-SemiBold': {'.': '.·∙●'},
+        'SpaceMono-Bold': {'.': '.·•'},
+        'Merchant Copy Doublesize': {},
     }
     # These are used for biasing the random select of characters
-    weights = [20] * len(string.digits)
+    weights = [25] * len(string.digits)
     weights += [5] * len(string.ascii_uppercase)
-    weights += [20] * len(TINY_PUNCT)
+    weights += [40] * len(TINY_PUNCT)
     weights += [1] * len(OTHER_PUNCT)
 
     def __init__(self, length):
@@ -67,24 +70,27 @@ class TrainingData(Dataset):
     def __getitem__(self, _) -> torch.uint8:
         # char = choice(CHARS)
         char = choices(CHARS, self.weights)[0]
+        font_path = choice(FONTS)
 
-        image = self.char_image(char)
+        image = self.char_image(char, font_path)
 
         data = TF.to_tensor(image)
         return data, CHAR_TO_CLASS[char]
 
-    def char_image(self, char):
+    def char_image(self, char, font_path):
         """Draw an image of the character."""
-        font_path = choice(FONTS)
-
         params = self.font_params.get(font_path.stem, {})
+
+        tweak = 0  # self.char_tweak.get(char, 0)
+        chars = params.get(char, char)
+        char = chars[-1]
 
         size_high = params.get('pt', int(CHAR_IMAGE.width * POINTS_TO_PIXELS))
         size_low = size_high - 2
         font_size = randint(size_low, size_high)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
-        size = font.getsize_multiline(char)
+        size = font.getsize(char)
         size = ImageSize(size[0], size[1])
 
         image = Image.new('L', CHAR_IMAGE, color='black')
@@ -93,15 +99,16 @@ class TrainingData(Dataset):
         left = left if left > 0 else 0
 
         top = (CHAR_IMAGE.height - size.height) // 2
-        top = top if top > 0 else 0
+        top = top if top > 0 else -tweak
 
         draw = ImageDraw.Draw(image)
         draw.text((left, top), char, font=font, fill='white')
 
-        image = add_soot(image, 0.2)
-        filter_ = params.get('filter', 'median')
+        image = add_soot(image, 0.25)
 
+        filter_ = params.get('filter', 'custom-median')
         image = filter_image(image, filter_)
+
         image = image.point(lambda x: 255 if x > 128 else 0)
 
         return image

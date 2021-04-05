@@ -118,14 +118,14 @@ def get_loaders(args):
 def train_log(losses):
     """Clean up after the training epoch."""
     avg_loss = np.mean(losses)
-    return f'training {avg_loss:0.6f}'
+    return f'training {avg_loss:0.8f}'
 
 
 def valid_log(losses, epoch, msg, best_loss):
     """Clean up after the validation epoch."""
     avg_loss = np.mean(losses)
     flag = '*' if avg_loss < best_loss else ''
-    logging.info(f'Epoch: {epoch: 3d} Loss {msg} validation {avg_loss:0.6f} {flag}')
+    logging.info(f'Epoch: {epoch:3d} Loss {msg} validation {avg_loss:0.8f} {flag}')
     return avg_loss
 
 
