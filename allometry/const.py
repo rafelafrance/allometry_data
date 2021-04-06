@@ -19,7 +19,6 @@ FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
 CHAR_IMAGE_SIZE = ImageSize(32, 48)
 
 TINY_PUNCT = '.-,'
-# OTHER_PUNCT = """$%*()<=>?+/;:^"""
 OTHER_PUNCT = """$%*()<=>+/:"""
 CHARS = list(string.digits + string.ascii_uppercase + TINY_PUNCT + OTHER_PUNCT)
 CHAR_TO_CLASS = {c: i for i, c in enumerate(CHARS)}

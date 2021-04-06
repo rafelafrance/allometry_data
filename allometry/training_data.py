@@ -18,17 +18,41 @@ class TrainingData(Dataset):
 
     # How to handle each font
     font_params = {
-        '1979_dot_matrix': {'.': '.•'},
-        'B612Mono-Bold': {'.': '.•●'},
-        'CourierPrime-Bold': {'pt': 48, '.': '.••'},
-        'FiraMono-Bold': {'.': '.·•∙●'},
-        'IBMPlexMono-Bold': {'.': '.·•'},
+        '1979_dot_matrix': {'.': '.•', 'pt': 40},
+        'B612Mono-Bold': {'.': '.•●', 'pt': 48, 'filter': 'custom-median'},
+        'B612Mono-Regular': {'.': '.•●', 'pt': 48},
+        'CourierPrime-Bold': {'pt': 48, 'filter': 'custom-median'},
+        'CourierPrime-BoldItalic': {'pt': 48, 'filter': 'custom-median', '.': '.••'},
+        'CourierPrime-Italic': {'pt': 48, '.': '.••'},
+        'CourierPrime-Regular': {'pt': 48, '.': '.••'},
+        'CutiveMono-Regular': {'pt': 52, '.': '.·•'},
+        'DOTMATRI': {'pt': 54},
+        'DOTMBold': {'pt': 48, 'filter': 'custom-median'},
+        'DottyRegular-vZOy': {'pt': 72},
+        'EHSMB': {'pt': 48},
+        'ELEKTRA_': {'pt': 54, '.': '.•'},
+        'FiraMono-Bold': {'.': '.·•∙●', 'filter': 'custom-median'},
+        'IBMPlexMono-Bold': {'.': '.·•', 'filter': 'custom-median'},
+        'Merchant Copy Doublesize': {'pt': 44, 'filter': 'custom-median'},
+        'Merchant Copy Wide': {'pt': 48, 'filter': 'custom-median'},
+        'Merchant Copy': {'pt': 72},
+        'Minecart_LCD': {'pt': 48},
+        'OcrB2': {'pt': 48, 'filter': 'custom-median', '.': '.·•∙'},
+        'Ordre de Départ': {'pt': 48},
         'OverpassMono-Bold': {'.': '.·•●'},
-        'SourceCodePro-Black': {'.': '.·∙●'},
-        'SourceCodePro-Bold': {'.': '.·∙●'},
-        'SpaceMono-Bold': {'.': '.·•'},
-        'Merchant Copy Doublesize': {},
+        'RobotoMono-Italic-VariableFont_wght': {'pt': 48, '.': '.·•'},
+        'RobotoMono-VariableFont_wght': {'pt': 48, '.': '.·•'},
+        'SourceCodePro-Black': {'.': '.·∙●', 'filter': 'custom-median'},
+        'SourceCodePro-Bold': {'.': '.·∙●', 'filter': 'custom-median'},
+        'SpaceMono-Bold': {'.': '.·•', 'filter': 'custom-median'},
+        'SyneMono-Regular': {'pt': 48, '.': '.·•'},
+        'VT323-Regular': {'pt': 54, '.': '.·•∙'},
+        'XanhMono-Regular': {'pt': 48},
+        'fake-receipt': {'pt': 48},
+        'hydrogen': {'pt': 54},
+        'scoreboard': {'pt': 48, '.': '.·•'},
     }
+
     # These are used for biasing the random select of characters
     weights = [25] * len(string.digits)
     weights += [5] * len(string.ascii_uppercase)
@@ -52,7 +76,7 @@ class TrainingData(Dataset):
         data = TF.to_tensor(image)
         return data, CHAR_TO_CLASS[char]
 
-    def char_image(self, char, font_path, soot_fract=0.075, filter_='custom-min'):
+    def char_image(self, char, font_path, filter_='median'):
         """Draw an image of the character."""
         params = self.font_params.get(font_path.stem, {})
 
@@ -79,6 +103,7 @@ class TrainingData(Dataset):
         draw = ImageDraw.Draw(image)
         draw.text((left, top), char, font=font, fill='white')
 
+        soot_fract = 0.1 if char in TINY_PUNCT else 0.25
         image = add_soot(image, soot_fract)
 
         filter_ = params.get('filter', filter_)

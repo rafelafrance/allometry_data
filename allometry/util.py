@@ -23,13 +23,16 @@ class Score:
         """Calculate the scores based on raw data."""
         self.avg_train_loss = np.mean(self.train_losses)
         self.avg_score_loss = np.mean(self.score_losses)
-        if self.total:
-            self.top_1 = 100.0 * sum(self.correct_1) / sum(self.total)
+
+        total = sum(self.total)  # paranoia
+        if total:
+            self.top_1 = 100.0 * sum(self.correct_1) / total
 
     def better_than(self, other):
         """Check if this score is better than the other one."""
         self.calc()
         return (-self.top_1, self.avg_score_loss) < (-other.top_1, other.avg_score_loss)
+        # return self.avg_score_loss < other.avg_score_loss
 
 
 def setup_logger(level=logging.INFO):
