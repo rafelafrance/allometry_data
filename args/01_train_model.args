@@ -1,8 +1,9 @@
 --model-dir=./data/model
 --model-arch=resnext101
+--model-state=best_resnext101_2021-04-06_a.pth
 --suffix=b
 --batch-size=32
 --epochs=300
 --learning-rate=0.0001
---seed=3645
+--seed=5646
 --score-size=1024
