@@ -43,7 +43,8 @@ def train(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    best_score = Score
+    best_score = Score()
+    best_loss = Score()
 
     for epoch in range(epoch_start, epoch_end):
         score = Score()
@@ -52,7 +53,8 @@ def train(args):
         score_batches(model, device, criterion, score_loader, args.seed, score)
 
         log_score(score, best_score, epoch)
-        best_score = save_state(model, args.model_dir, name, epoch, score, best_score)
+        best_score, best_loss = save_state(
+            model, args.model_dir, name, epoch, score, best_score, best_loss)
 
 
 def train_batches(model, device, criterion, loader, optimizer, score):
@@ -101,7 +103,7 @@ def log_score(score, best_score, epoch):
                  f'Accuracy: {score.top_1:12.8f} % {flag}')
 
 
-def save_state(model, model_dir, name, epoch, score, best_score):
+def save_state(model, model_dir, name, epoch, score, best_score, best_loss):
     """Save the model if the current score is better than the best one."""
     model.state_dict()['epoch'] = epoch
 
@@ -110,7 +112,12 @@ def save_state(model, model_dir, name, epoch, score, best_score):
         torch.save(model.state_dict(), path)
         best_score = score
 
-    return best_score
+    if score.avg_score_loss < best_loss.avg_score_loss:
+        path = model_dir / f'best_loss_{name}.pth'
+        torch.save(model.state_dict(), path)
+        best_loss = score
+
+    return best_score, best_loss
 
 
 def get_loaders(args):
@@ -122,14 +129,12 @@ def get_loaders(args):
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        drop_last=True,
         num_workers=args.workers,
     )
 
     score_loader = DataLoader(
         score_dataset,
         batch_size=args.batch_size,
-        drop_last=True,
         num_workers=args.workers,
     )
 

@@ -1,8 +1,10 @@
 --model-dir=./data/model
+--model-state=best_resnext101_2021-04-08_context_b.pth
 --model-arch=resnext101
---suffix=context_a
---batch-size=32
---epochs=300
+--suffix=context_c
+--batch-size=50
+--epochs=500
 --learning-rate=0.0001
---seed=5646
---score-size=1024
+--seed=5650
+--train-size=20000
+--score-size=20000
