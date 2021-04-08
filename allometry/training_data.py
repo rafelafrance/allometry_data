@@ -1,6 +1,5 @@
 """Generate training data."""
 
-import string
 from random import choice, choices, getstate, randint, seed, setstate
 
 import numpy as np
@@ -9,9 +8,9 @@ import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from torch.utils.data import Dataset
 
-from allometry.const import (CHAR_IMAGE_SIZE, CHAR_TO_CLASS, CHARS, FONTS,
-                             OTHER_PUNCT, POINTS_TO_PIXELS, TINY_PUNCT,
-                             ImageSize)
+from allometry.characters import (CHAR_TO_IDX, float_chars, int_chars, single_chars,
+                                  word_chars)
+from allometry.const import CHAR_IMAGE_SIZE, FONTS, ImageSize
 
 
 class TrainingData(Dataset):
@@ -54,11 +53,9 @@ class TrainingData(Dataset):
         'scoreboard': {'pt': 48, '.': '.·•'},
     }
 
-    # These are used for biasing the random select of characters
-    weights = [25] * len(string.digits)
-    weights += [5] * len(string.ascii_uppercase)
-    weights += [40] * len(TINY_PUNCT)
-    weights += [1] * len(OTHER_PUNCT)
+    func_weights = {float_chars: 20, word_chars: 10, single_chars: 5, int_chars: 1}
+    funcs = list(func_weights.keys())
+    weights = list(func_weights.values())
 
     def __init__(self, length):
         """Generate a dataset."""
@@ -70,39 +67,29 @@ class TrainingData(Dataset):
 
     def __getitem__(self, _) -> tuple[torch.Tensor, int]:
         """Get a training image for a character and its target class."""
-        char = choices(CHARS, self.weights)[0]
         font_path = choice(FONTS)
 
-        image = self.single_char(char, font_path)
+        func = choices(self.funcs, self.weights)[0]
+        chars = func()
+
+        image = self.char_image(chars, font_path)
 
         data = TF.to_tensor(image)
-        return data, CHAR_TO_CLASS[char]
+        return data, CHAR_TO_IDX[chars[1]]
 
-    def single__getitem__(self, _) -> tuple[torch.Tensor, int]:
-        """Get a training image for a single character and its target class."""
-        # char = choice(CHARS)
-        char = choices(CHARS, self.weights)[0]
-        font_path = choice(FONTS)
-
-        image = self.single_char(char, font_path)
-
-        data = TF.to_tensor(image)
-        return data, CHAR_TO_CLASS[char]
-
-    def single_char(self, char, font_path, filter_='median'):
+    def char_image(self, chars, font_path, filter_='median'):
         """Draw an image of one character."""
         params = self.font_params.get(font_path.stem, {})
 
-        tweak = 0  # self.char_tweak.get(char, 0)
-        chars = params.get(char, char)
-        char = chars[-1]
+        chars = [params.get(c, c)[-1] for c in chars]
+        chars = ''.join(chars)
 
-        size_high = params.get('pt', int(CHAR_IMAGE_SIZE.width * POINTS_TO_PIXELS))
-        size_low = size_high - 2
+        size_high = params.get('pt', 42)
+        size_low = size_high - 4
         font_size = randint(size_low, size_high)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
-        size = font.getsize(char)
+        size = font.getsize(chars)
         size = ImageSize(size[0], size[1])
 
         image = Image.new('L', CHAR_IMAGE_SIZE, color='black')
@@ -111,13 +98,12 @@ class TrainingData(Dataset):
         left = left if left > 0 else 0
 
         top = (CHAR_IMAGE_SIZE.height - size.height) // 2
-        top = top if top > 0 else -tweak
+        top = top if top > 0 else 0
 
         draw = ImageDraw.Draw(image)
-        draw.text((left, top), char, font=font, fill='white')
+        draw.text((left, top), chars, font=font, fill='white')
 
-        soot_fract = 0.1 if char in TINY_PUNCT else 0.25
-        image = add_soot(image, soot_fract)
+        image = add_soot(image, 0.2)
 
         filter_ = params.get('filter', filter_)
         image = filter_image(image, filter_)

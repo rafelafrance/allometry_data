@@ -30,7 +30,7 @@ class AllometrySheet(Dataset):
         self.box_width = kwargs.get('box_width', 8)  # A box must be this wide
         self.fat_row = kwargs.get('fat_row', 60)  # How many pixels for a fat row
         self.deskew_range = kwargs.get('deskew_range', (-0.2, 0.21, 0.01))  # Angles
-        self.split_radius = 5  # Look to split fat rows within this span
+        self.split_radius = 5  # Split fat rows at lowest profile within this span
 
         self.image = Image.open(path).convert('L')
         if rotate:

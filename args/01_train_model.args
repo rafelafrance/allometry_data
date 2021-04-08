@@ -1,6 +1,6 @@
 --model-dir=./data/model
---model-arch=resnet152
---suffix=c
+--model-arch=resnext101
+--suffix=context_a
 --batch-size=32
 --epochs=300
 --learning-rate=0.0001

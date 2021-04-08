@@ -4,8 +4,7 @@ import torch
 from torch import nn
 from torchvision import models
 
-from allometry.const import CHARS
-
+from allometry.characters import CHARS
 
 MODELS = {
     'resnet18': models.resnet18,
