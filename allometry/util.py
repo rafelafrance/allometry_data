@@ -31,8 +31,8 @@ class Score:
     def better_than(self, other):
         """Check if this score is better than the other one."""
         self.calc()
-        return (-self.top_1, self.avg_score_loss) < (-other.top_1, other.avg_score_loss)
         # return self.avg_score_loss < other.avg_score_loss
+        return (-self.top_1, self.avg_score_loss) < (-other.top_1, other.avg_score_loss)
 
 
 def setup_logger(level=logging.INFO):

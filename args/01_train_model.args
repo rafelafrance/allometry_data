@@ -1,7 +1,6 @@
 --model-dir=./data/model
---model-arch=resnext101
---model-state=best_resnext101_2021-04-06_a.pth
---suffix=b
+--model-arch=resnet152
+--suffix=c
 --batch-size=32
 --epochs=300
 --learning-rate=0.0001

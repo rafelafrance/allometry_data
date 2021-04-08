@@ -9,8 +9,9 @@ import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from torch.utils.data import Dataset
 
-from allometry.const import (CHARS, CHAR_IMAGE_SIZE, CHAR_TO_CLASS, FONTS, ImageSize,
-                             OTHER_PUNCT, POINTS_TO_PIXELS, TINY_PUNCT)
+from allometry.const import (CHAR_IMAGE_SIZE, CHAR_TO_CLASS, CHARS, FONTS,
+                             OTHER_PUNCT, POINTS_TO_PIXELS, TINY_PUNCT,
+                             ImageSize)
 
 
 class TrainingData(Dataset):
@@ -60,24 +61,36 @@ class TrainingData(Dataset):
     weights += [1] * len(OTHER_PUNCT)
 
     def __init__(self, length):
-        """Generate a dataset using pairs of images."""
+        """Generate a dataset."""
         self.length = length
 
     def __len__(self):
+        """Return the length given in the constructor."""
         return self.length
 
-    def __getitem__(self, _) -> torch.uint8:
-        # char = choice(CHARS)
+    def __getitem__(self, _) -> tuple[torch.Tensor, int]:
+        """Get a training image for a character and its target class."""
         char = choices(CHARS, self.weights)[0]
         font_path = choice(FONTS)
 
-        image = self.char_image(char, font_path)
+        image = self.single_char(char, font_path)
 
         data = TF.to_tensor(image)
         return data, CHAR_TO_CLASS[char]
 
-    def char_image(self, char, font_path, filter_='median'):
-        """Draw an image of the character."""
+    def single__getitem__(self, _) -> tuple[torch.Tensor, int]:
+        """Get a training image for a single character and its target class."""
+        # char = choice(CHARS)
+        char = choices(CHARS, self.weights)[0]
+        font_path = choice(FONTS)
+
+        image = self.single_char(char, font_path)
+
+        data = TF.to_tensor(image)
+        return data, CHAR_TO_CLASS[char]
+
+    def single_char(self, char, font_path, filter_='median'):
+        """Draw an image of one character."""
         params = self.font_params.get(font_path.stem, {})
 
         tweak = 0  # self.char_tweak.get(char, 0)
