@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 from allometry.characters import (CHAR_TO_IDX, float_chars, int_chars, single_chars,
                                   word_chars)
-from allometry.const import CHAR_IMAGE_SIZE, FONTS, ImageSize
+from allometry.const import CONTEXT_SIZE, FONTS, ImageSize
 
 
 class TrainingData(Dataset):
@@ -92,12 +92,12 @@ class TrainingData(Dataset):
         size = font.getsize(chars)
         size = ImageSize(size[0], size[1])
 
-        image = Image.new('L', CHAR_IMAGE_SIZE, color='black')
+        image = Image.new('L', CONTEXT_SIZE, color='black')
 
-        left = (CHAR_IMAGE_SIZE.width - size.width) // 2
+        left = (CONTEXT_SIZE.width - size.width) // 2
         left = left if left > 0 else 0
 
-        top = (CHAR_IMAGE_SIZE.height - size.height) // 2
+        top = (CONTEXT_SIZE.height - size.height) // 2
         top = top if top > 0 else 0
 
         draw = ImageDraw.Draw(image)

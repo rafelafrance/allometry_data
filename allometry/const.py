@@ -15,6 +15,6 @@ TEXT_DIR = DATA_DIR / 'text'
 FONTS_DIR = ROOT_DIR / 'fonts'
 FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
 
-CHAR_IMAGE_SIZE = ImageSize(32 * 4, 48)
+CONTEXT_SIZE = ImageSize(32 * 4, 48)
 
 POINTS_TO_PIXELS = 1.333333

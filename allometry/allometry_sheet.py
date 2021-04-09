@@ -9,10 +9,11 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
 
-from allometry.const import BBox, CHAR_IMAGE_SIZE, ImageSize
+from allometry.const import BBox, CONTEXT_SIZE, ImageSize
 
 Where = namedtuple('Where', 'line type')
 Row = namedtuple('Row', 'top bottom')
+Col = namedtuple('Col', 'left right')
 
 
 class AllometrySheet(Dataset):
@@ -31,6 +32,7 @@ class AllometrySheet(Dataset):
         self.fat_row = kwargs.get('fat_row', 60)  # How many pixels for a fat row
         self.deskew_range = kwargs.get('deskew_range', (-0.2, 0.21, 0.01))  # Angles
         self.split_radius = 5  # Split fat rows at lowest profile within this span
+        self.char_size = kwargs.get('char_size', ImageSize(32, 48))
 
         self.image = Image.open(path).convert('L')
         if rotate:
@@ -47,11 +49,39 @@ class AllometrySheet(Dataset):
         """Return the count of characters on the sheet."""
         return len(self.chars)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, BBox]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, tuple]:
         """Get a single character and its class."""
         image, box = self.char_image(idx)
         data = TF.to_tensor(image)
         return data, box
+
+    def char_image(self, idx):
+        """Crop the character and its context and put it into an image."""
+        image = Image.new('L', CONTEXT_SIZE, color='black')
+
+        box = self.chars[idx]
+        before = self.chars[idx - 1] if idx > 0 else None
+        after = self.chars[idx + 1] if idx < len(self.chars) - 1 else None
+
+        cropped = self.binary.crop(box)
+
+        # Put the target character into the middle of the image
+        left = (CONTEXT_SIZE.width - cropped.size[0]) // 2
+        top = (CONTEXT_SIZE.height - cropped.size[1]) // 2
+
+        image.paste(cropped, (left, top))
+
+        if before and (box.left - before.right) < self.char_size.width:
+            cropped = self.binary.crop(before)
+            new_left = left - (box.left - before.left)
+            image.paste(cropped, (new_left, top))
+
+        if after and (after.left - box.right) < self.char_size.width:
+            cropped = self.binary.crop(after)
+            new_left = left + (after.left - box.left)
+            image.paste(cropped, (new_left, top))
+
+        return image, box
 
     def split_fat_rows(self, rows):
         """Split fat rows at the point where there are the fewest "on" pixels."""
@@ -83,7 +113,7 @@ class AllometrySheet(Dataset):
         fat_rows = sum(1 for r in rows if r.bottom - r.top > self.fat_row)
 
         if fat_rows == 0:
-            return binary_image
+            return binary_image, rows
 
         thin_rows = sum(1 for r in rows if r.bottom - r.top < self.fat_row)
         best = (thin_rows, binary_image, rows)
@@ -96,22 +126,6 @@ class AllometrySheet(Dataset):
                 best = (thin_rows, rotated, rows)
 
         return best[1], best[2]
-
-    def char_image(self, idx):
-        """Crop the character into its own image."""
-        image = Image.new('L', CHAR_IMAGE_SIZE, color='black')
-
-        box = self.chars[idx]
-
-        cropped = self.binary.crop(box)
-
-        # Put the character into the middle of the image
-        left = (CHAR_IMAGE_SIZE.width - cropped.size[0]) // 2
-        top = (CHAR_IMAGE_SIZE.height - cropped.size[1]) // 2
-
-        image.paste(cropped, (left, top))
-
-        return image, box
 
     def find_rows(self, image) -> list[Row]:
         """Find rows in the image."""

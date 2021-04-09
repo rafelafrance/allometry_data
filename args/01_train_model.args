@@ -6,5 +6,5 @@
 --epochs=500
 --learning-rate=0.0001
 --seed=5650
---train-size=20000
---score-size=20000
+--train-size=10000
+--score-size=10000

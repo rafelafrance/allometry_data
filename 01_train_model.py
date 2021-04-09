@@ -100,7 +100,7 @@ def log_score(score, best_score, epoch):
     logging.info(f'Epoch: {epoch:3d} Average loss '
                  f'(train: {score.avg_train_loss:0.8f},'
                  f' score: {score.avg_score_loss:0.8f}) '
-                 f'Accuracy: {score.top_1:12.8f} % {flag}')
+                 f'Accuracy: {score.top_1:6.4f} % {flag}')
 
 
 def save_state(model, model_dir, name, epoch, score, best_score, best_loss):
