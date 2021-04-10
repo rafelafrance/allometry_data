@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test a model at recognizing digits on allometry sheets."""
+"""Run a model on real allometry sheets."""
 
 import argparse
 import logging

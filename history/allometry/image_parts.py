@@ -14,7 +14,7 @@ class ImageParts(Dataset):
     """Get data from image files stored in 'x_dir' and 'y_dir' directories."""
 
     def __init__(self, image_pairs, *, size=None):
-        """Generate a dataset using pairs of images."""
+        """Generate a dataset using line_pairs of images."""
         self.images = []
         self.size = size
 
