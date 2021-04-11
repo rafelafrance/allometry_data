@@ -26,6 +26,7 @@ def test(args):
 
     if args.seed is not None:
         torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         seed(args.seed)
 
     name = f'{args.model}_{date.today().isoformat()}'
@@ -52,7 +53,7 @@ def test(args):
         msg = train_log(losses)
         losses = []
 
-        valid_batches(model, device, criterion, losses, valid_loader, args.seed)
+        valid_batches(model, device, criterion, losses, valid_loader)
         avg_loss = valid_log(losses, epoch, msg, best_loss)
         losses = []
 
@@ -74,22 +75,15 @@ def train_batches(model, device, criterion, losses, loader, optimizer):
             optimizer.step()
 
 
-def valid_batches(model, device, criterion, losses, loader, seed_):
+def valid_batches(model, device, criterion, losses, loader):
     """Run the validating phase of the epoch."""
     model.eval()
-
-    # Use the same validation images for each epoch i.e. same augmentations
-    rand_state = TrainingData.get_state(seed_)
-
     for x, y in loader:
         x, y = x.to(device), y.to(device)
         with torch.set_grad_enabled(False):
             pred = model(x)
             batch_loss = criterion(pred, y)
             losses.append(batch_loss.item())
-
-    # Return to the current state of the training random number generator
-    TrainingData.set_state(rand_state)
 
 
 def get_loaders(args):

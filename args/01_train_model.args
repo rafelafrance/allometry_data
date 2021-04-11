@@ -1,7 +1,7 @@
 --model-dir=./data/model
---model-state=best_resnext101_2021-04-08_context_b.pth
+--model-state=best_resnext101_2021-04-08_context_c.pth
 --model-arch=resnext101
---suffix=context_c
+--suffix=random_a
 --batch-size=50
 --epochs=500
 --learning-rate=0.0001

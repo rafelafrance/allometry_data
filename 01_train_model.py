@@ -5,9 +5,10 @@ import argparse
 import logging
 import textwrap
 from datetime import date
+from functools import partial
 from os import makedirs
 from pathlib import Path
-from random import seed
+from random import seed, randint
 
 import torch
 import torch.optim as optim
@@ -15,7 +16,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from allometry.model_util import MODELS, get_model, load_model_state
-from allometry.training_data import TrainingData
+from allometry.training_data import TrainingData, train_worker_init, score_worker_init
 from allometry.util import Score, finished, started
 
 
@@ -50,7 +51,7 @@ def train(args):
         score = Score()
 
         train_batches(model, device, criterion, train_loader, optimizer, score)
-        score_batches(model, device, criterion, score_loader, args.seed, score)
+        score_batches(model, device, criterion, score_loader, score)
 
         log_score(score, best_score, epoch)
         best_score, best_loss = save_state(
@@ -72,11 +73,8 @@ def train_batches(model, device, criterion, loader, optimizer, score):
             optimizer.step()
 
 
-def score_batches(model, device, criterion, loader, seed_, score):
+def score_batches(model, device, criterion, loader, score):
     """Run the validating phase of the epoch."""
-    # Use the same images for scoring i.e. same augmentations
-    rand_state = TrainingData.get_state(seed_)
-
     model.eval()
 
     for x, y in loader:
@@ -88,9 +86,6 @@ def score_batches(model, device, criterion, loader, seed_, score):
             score.score_losses.append(loss.item())
             score.total.append(y.size(0))
             score.correct_1.append((idx == y).sum().item())
-
-    # Return to the current state of the training random number generator
-    TrainingData.set_state(rand_state)
 
 
 def log_score(score, best_score, epoch):
@@ -130,12 +125,14 @@ def get_loaders(args):
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.workers,
+        worker_init_fn=train_worker_init,
     )
 
     score_loader = DataLoader(
         score_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
+        worker_init_fn=partial(score_worker_init, seed_=args.seed)
     )
 
     return train_loader, score_loader
@@ -214,6 +211,9 @@ def parse_args():
     #     '--runs-dir', help="""Save tensor board logs to this directory.""")
 
     args = arg_parser.parse_args()
+
+    # Wee need something for the scoring pass
+    args.seed = args.seed if args.seed is not None else randint(0, 4_000_000_000)
 
     return args
 

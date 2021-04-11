@@ -1,7 +1,5 @@
 """Generate training data."""
 
-from random import choice, choices, getstate, randint, seed, setstate
-
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
@@ -53,9 +51,10 @@ class TrainingData(Dataset):
         'scoreboard': {'pt': 48, '.': '.·•'},
     }
 
-    func_weights = {float_chars: 20, word_chars: 10, single_chars: 5, int_chars: 1}
-    funcs = list(func_weights.keys())
-    weights = list(func_weights.values())
+    funcs = ([float_chars] * 20
+             + [word_chars] * 10
+             + [single_chars] * 5
+             + [int_chars])
 
     def __init__(self, length):
         """Generate a dataset."""
@@ -67,9 +66,9 @@ class TrainingData(Dataset):
 
     def __getitem__(self, _) -> tuple[torch.Tensor, int]:
         """Get a training image for a character and its target class."""
-        font_path = choice(FONTS)
+        font_path = np.random.choice(FONTS)
 
-        func = choices(self.funcs, self.weights)[0]
+        func = np.random.choice(self.funcs)
         chars = func()
 
         image = self.char_image(chars, font_path)
@@ -86,7 +85,7 @@ class TrainingData(Dataset):
 
         size_high = params.get('pt', 42)
         size_low = size_high - 4
-        font_size = randint(size_low, size_high)
+        font_size = np.random.randint(size_low, size_high)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
         size = font.getsize(chars)
@@ -112,20 +111,15 @@ class TrainingData(Dataset):
 
         return image
 
-    @staticmethod
-    def get_state(seed_):
-        """Get the current random state so we can return to it later."""
-        rand_state = None
-        if seed_ is not None:
-            rand_state = getstate()
-            seed(seed_)
-        return rand_state
 
-    @staticmethod
-    def set_state(rand_state):
-        """Continue with an existing random number generator."""
-        if rand_state is not None:
-            setstate(rand_state)
+def train_worker_init(worker_id):
+    """Setup a training worker thread."""
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+
+def score_worker_init(worker_id, seed_=0):
+    """Force scoring threads to repeat the same data."""
+    np.random.seed(seed_ + worker_id)
 
 
 def custom_filter(image):
