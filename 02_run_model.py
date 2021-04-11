@@ -88,25 +88,17 @@ def valid_batches(model, device, criterion, losses, loader):
 
 def get_loaders(args):
     """Get the data loaders."""
-    train_dataset = TrainingData(args.train_size)
-    valid_dataset = TrainingData(args.valid_size)
+    sheet_dataset = TrainingData(args.train_size)
 
-    train_loader = DataLoader(
-        train_dataset,
+    sheet_loader = DataLoader(
+        sheet_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
         num_workers=args.workers,
     )
 
-    valid_loader = DataLoader(
-        valid_dataset,
-        batch_size=args.batch_size,
-        drop_last=True,
-        num_workers=args.workers,
-    )
-
-    return train_loader, valid_loader
+    return sheet_loader
 
 
 def train_log(losses):

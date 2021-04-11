@@ -3,7 +3,7 @@
 --model-arch=resnext101
 --suffix=random_a
 --batch-size=50
---epochs=500
+--epochs=100
 --learning-rate=0.0001
 --seed=5650
 --train-size=10000

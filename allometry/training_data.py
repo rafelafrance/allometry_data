@@ -112,16 +112,6 @@ class TrainingData(Dataset):
         return image
 
 
-def train_worker_init(worker_id):
-    """Setup a training worker thread."""
-    np.random.seed(np.random.get_state()[1][0] + worker_id)
-
-
-def score_worker_init(worker_id, seed_=0):
-    """Force scoring threads to repeat the same data."""
-    np.random.seed(seed_ + worker_id)
-
-
 def custom_filter(image):
     """Degrade image in realistic way."""
     image = image.filter(ImageFilter.Kernel(

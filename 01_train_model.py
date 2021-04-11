@@ -10,13 +10,14 @@ from os import makedirs
 from pathlib import Path
 from random import seed, randint
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
 from allometry.model_util import MODELS, get_model, load_model_state
-from allometry.training_data import TrainingData, train_worker_init, score_worker_init
+from allometry.training_data import TrainingData
 from allometry.util import Score, finished, started
 
 
@@ -125,14 +126,14 @@ def get_loaders(args):
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.workers,
-        worker_init_fn=train_worker_init,
+        worker_init_fn=lambda w: np.random.seed(np.random.get_state()[1][0] + w),
     )
 
     score_loader = DataLoader(
         score_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
-        worker_init_fn=partial(score_worker_init, seed_=args.seed)
+        worker_init_fn=lambda w: np.random.seed(args.seed + w),
     )
 
     return train_loader, score_loader
