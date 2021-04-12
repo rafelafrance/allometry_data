@@ -69,6 +69,8 @@ class AllometrySheet(Dataset):
             row_threshold=row_threshold,
         )
 
+        self.chars: list[BBox] = []
+
         for row in rows:
             chars = find_chars(
                 self.binary,
@@ -78,8 +80,6 @@ class AllometrySheet(Dataset):
                 min_pixels=min_pixels,
             )
             self.chars.extend(chars)
-
-        self.chars = []
 
     def __len__(self) -> int:
         """Return the count of characters on the sheet."""
