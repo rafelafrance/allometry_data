@@ -5,10 +5,9 @@ import argparse
 import logging
 import textwrap
 from datetime import date
-from functools import partial
 from os import makedirs
 from pathlib import Path
-from random import seed, randint
+from random import randint, seed
 
 import numpy as np
 import torch
@@ -27,6 +26,7 @@ def train(args):
 
     if args.seed is not None:
         torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         seed(args.seed)
 
     name = f'{args.model_arch}_{date.today().isoformat()}'
@@ -91,12 +91,13 @@ def score_batches(model, device, criterion, loader, score):
 
 def log_score(score, best_score, epoch):
     """Clean up after the scoring epoch."""
-    flag = '*' if score.better_than(best_score) else ''
+    acc_flag = '*' if score.better_than(best_score) else ''
+    score_flag = '*' if score.avg_score_loss < best_score.avg_score_loss else ' '
 
     logging.info(f'Epoch: {epoch:3d} Average loss '
                  f'(train: {score.avg_train_loss:0.8f},'
-                 f' score: {score.avg_score_loss:0.8f}) '
-                 f'Accuracy: {score.top_1:6.4f} % {flag}')
+                 f' score: {score.avg_score_loss:0.8f}) {score_flag} '
+                 f'Accuracy: {score.top_1:6.4f} % {acc_flag}')
 
 
 def save_state(model, model_dir, name, epoch, score, best_score, best_loss):
@@ -123,8 +124,8 @@ def get_loaders(args):
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=args.batch_size,
         shuffle=True,
+        batch_size=args.batch_size,
         num_workers=args.workers,
         worker_init_fn=lambda w: np.random.seed(np.random.get_state()[1][0] + w),
     )

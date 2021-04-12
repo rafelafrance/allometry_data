@@ -18,3 +18,5 @@ FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
 CONTEXT_SIZE = ImageSize(32 * 4, 48)
 
 POINTS_TO_PIXELS = 1.333333
+
+ON, OFF = 255, 0

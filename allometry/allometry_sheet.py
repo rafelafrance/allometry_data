@@ -8,19 +8,18 @@ import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
+from scipy import signal
 
-from allometry.const import BBox, CONTEXT_SIZE
+from allometry.const import BBox, CONTEXT_SIZE, ON
 
-ThresholdBreak = namedtuple('ThresholdBreak', 'line type')
-Row = namedtuple('Row', 'top bottom')
-Col = namedtuple('Col', 'left right')
+Pair = namedtuple('Row', 'low high')
 
 
 class AllometrySheet(Dataset):
     """A dataset for dissecting real allometry sheets.
 
     1) Prepare the image for dissection.
-       Orient the image: This is just rotating by 0, 90, 180, 0r 270 degrees.
+       Orient the image: This is just rotating by 0, 90, 180, or 270 degrees.
        Binarize the image: Convert the image into white text on a black background.
        Deskew the image: Fine tune the image rotation to get rows even with the edge.
 
@@ -36,8 +35,14 @@ class AllometrySheet(Dataset):
 
     def __init__(self, path: Path, rotate: int = 0, **kwargs):
         """Dissect a image of an allometry sheet and find all of its characters."""
-        padding = kwargs.get('padding', 1)  # How many pixels border each character
-        fat_row = kwargs.get('fat_row', 60)  # Row with this many pixels are too fat
+        padding = kwargs.get('padding', 2)  # How many pixels border each character
+        bin_threshold = kwargs.get('bin_threshold', 230)  # Binary threshold
+        vert_dist = kwargs.get('vert_dist', 40)
+        row_threshold = kwargs.get('row_threshold', 40)
+        horiz_dist = kwargs.get('horiz_dist', 30)
+        min_pixels = kwargs.get('min_pixels', 40)
+        fat_row = kwargs.get('fat_row', 40)
+        deskew_range = kwargs.get('deskew_range', (-0.2, 0.21, 0.01))
 
         self.image = Image.open(path).convert('L')
 
@@ -46,42 +51,45 @@ class AllometrySheet(Dataset):
             self.image = self.image.rotate(rotate, expand=True, fillcolor='white')
 
         # Convert to a binary image with white text on black background
-        bin_threshold = kwargs.get('bin_threshold', 230)  # Binary threshold
         self.binary = self.image.point(lambda x: 255 if x < bin_threshold else 0)
 
-        # Fine tune the image rotation
-        self.binary, rows = deskew_image(
+        self.binary = deskew_image(
             self.binary,
-            deskew_range=kwargs.get('deskew_range', (-0.2, 0.21, 0.01)),
-            fat_row=fat_row,
             padding=padding,
-            row_threshold=kwargs.get('row_threshold', 20),
+            fat_row=fat_row,
+            vert_dist=vert_dist,
+            row_threshold=row_threshold,
+            deskew_range=deskew_range,
         )
 
-        # Some rows will have multiple lines of text, split them at the thinnest point
-        rows = split_fat_rows(
+        rows = find_rows(
             self.binary,
-            rows,
-            fat_row=fat_row,
-            split_radius=kwargs.get('split_radius', 5))
-
-        # Now split rows of text into characters
-        self.chars: list[BBox] = find_chars(
-            self.binary,
-            rows,
             padding=padding,
-            box_width=kwargs.get('box_width', 8),
-            col_threshold=kwargs.get('col_threshold', 0))
+            vert_dist=vert_dist,
+            row_threshold=row_threshold,
+        )
+
+        for row in rows:
+            chars = find_chars(
+                self.binary,
+                row,
+                padding=padding,
+                horiz_dist=horiz_dist,
+                min_pixels=min_pixels,
+            )
+            self.chars.extend(chars)
+
+        self.chars = []
 
     def __len__(self) -> int:
         """Return the count of characters on the sheet."""
         return len(self.chars)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, BBox]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.IntTensor]:
         """Get a single character and its class."""
         image, box = self.char_image(idx)
         data = TF.to_tensor(image)
-        return data, box
+        return data, torch.IntTensor(box)
 
     def char_image(self, idx: int, *, char_width: int = 32) -> tuple[Image, BBox]:
         """Crop the character and its context and put it into an image."""
@@ -119,21 +127,26 @@ def deskew_image(
         fat_row: int = 60,
         row_threshold: int = 20,
         padding: int = 1,
-) -> tuple[Image, list[Row]]:
-    """Deskew a binary image."""
-    rows = find_rows(binary_image, row_threshold=row_threshold, padding=padding)
-    fat_rows = sum(1 for r in rows if r.bottom - r.top > fat_row)
+        vert_dist: int = 40,
+) -> Image:
+    """Fine tune the rotation of a binary image."""
+    rows = find_rows(
+        binary_image,
+        padding=padding,
+        row_threshold=row_threshold, vert_dist=vert_dist,
+    )
+    fat_rows = sum(1 for r in rows if r.low - r.high > fat_row)
 
     if fat_rows == 0:
-        return binary_image, rows
+        return binary_image
 
-    thin_rows = sum(1 for r in rows if r.bottom - r.top < fat_row)
+    thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
     best = (thin_rows, binary_image, rows)
 
     for angle in np.arange(*deskew_range):
         rotated = rotate_image(binary_image, angle)
         rows = find_rows(rotated, row_threshold=row_threshold, padding=padding)
-        thin_rows = sum(1 for r in rows if r.bottom - r.top < fat_row)
+        thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
         if thin_rows > best[0]:
             best = (thin_rows, rotated, rows)
 
@@ -152,174 +165,63 @@ def rotate_image(image: Image, angle: float) -> Image:
 def find_rows(
         binary_image: Image,
         *,
-        row_threshold: int = 20,
         padding: int = 1,
-) -> list[Row]:
+        row_threshold: int = 40,
+        vert_dist: int = 40,
+) -> list[Pair]:
     """Find rows in the image."""
-    threshold_breaks = chop_image(binary_image, threshold=row_threshold)
-    tops, bottoms = line_pairs(threshold_breaks, padding)
-    rows = [Row(t, b) for t, b in zip(tops, bottoms)]
-    return rows
+    data = np.array(binary_image) // ON
 
+    proj = data.sum(axis=1)
+    proj = proj < (binary_image.size[0] // row_threshold)
+    proj = proj.astype(int) * ON
 
-def split_fat_rows(
-        binary_image: Image,
-        rows: list[Row],
-        *,
-        fat_row: int = 60,
-        split_radius: int = 5,
-) -> list[Row]:
-    """Split fat rows at the point where there are the fewest "on" pixels."""
-    new_rows = []
-    proj = None
+    proj[0] = 0
+    proj[-1] = 0
 
-    for row in rows:
-        count = round((row.bottom - row.top) / fat_row)
+    peaks = signal.find_peaks(proj, distance=vert_dist, plateau_size=1)
 
-        if count < 2:
-            new_rows.append(row)
+    tops = peaks[1]['right_edges']
+    bots = peaks[1]['left_edges'][1:]
+    pairs = [Pair(t-padding, b+padding) for t, b in zip(tops, bots)]
 
-        else:
-            if proj is None:
-                data = np.array(binary_image).copy() / 255
-                proj = data.sum(axis=1)
-
-            if count == 2:
-                mid = row.top + ((row.bottom - row.top) // 2)
-                north = mid - split_radius
-                south = mid + split_radius + 1
-                split = np.argmin(proj[north:south])
-                div = mid - split_radius + split
-                new_rows.append(Row(row.top, div))
-                new_rows.append(Row(div, row.bottom))
-
-            else:
-                raise ValueError
-
-    return new_rows
+    return pairs
 
 
 def find_chars(
         binary_image: Image,
-        rows: list[Row],
+        row: Pair,
         *,
-        padding: int = 1,
-        box_width: int = 8,
-        col_threshold: int = 0
+        padding: int = 2,
+        horiz_dist: int = 30,
+        min_pixels: int = 40,
 ) -> list[BBox]:
-    """Find all characters in a line of text."""
-    chars = []
-    for row in rows:
-        binary_row = binary_image.crop((0, row.top, binary_image.size[0], row.bottom))
+    """Find all of the characters in a row."""
+    line = binary_image.crop((0, row.low, binary_image.size[0], row.high))
 
-        threshold_breaks = chop_image(binary_row, axis=0, threshold=col_threshold)
+    data = np.array(line) // ON
 
-        lefts, rights = line_pairs(threshold_breaks, padding)
-        cols = [Col(ll, rr) for ll, rr in zip(lefts, rights)]
+    proj = data.sum(axis=0)
+    proj = proj == 0
+    proj = proj.astype(int) * ON
 
-        cols = split_fat_chars(binary_row, cols)
+    proj[0] = 0
+    proj[-1] = 0
 
-        boxes = merge_boxes(cols, row)
-        boxes = [b for b in boxes if b.right - b.left >= box_width]
-        chars.extend(boxes)
+    peaks = signal.find_peaks(proj, distance=horiz_dist, plateau_size=1)
 
-    return chars
+    lefts = peaks[1]['right_edges']
+    rights = peaks[1]['left_edges'][1:]
+    cols = [Pair(left-padding, right+padding) for left, right in zip(lefts, rights)]
 
-
-def split_fat_chars(
-        binary_row: Image,
-        cols: list[Col],
-        *,
-        fat_col: int = 35,
-        split_radius: int = 5,
-) -> list[Col]:
-    """Some characters blur into each other, we split these a the thinnest point."""
-    new_cols = []
-    proj = None
+    boxes: list[BBox] = []
 
     for col in cols:
-        count = round((col.right - col.left) / fat_col)
-
-        if count < 2:
-            new_cols.append(col)
-
-        else:
-            if proj is None:
-                data = np.array(binary_row).copy() / 255
-                proj = data.sum(axis=0)
-
-            if count == 2:
-                mid = col.left + ((col.right - col.left) // 2)
-                east = mid - split_radius
-                west = mid + split_radius
-                split = np.argmin(proj[east:west])
-                div = mid - split + split
-                new_cols.append(Col(col.left, div))
-                new_cols.append(Col(div, col.right))
-
-            # else:
-            #     raise ValueError
-
-    return new_cols
-
-
-def merge_boxes(
-        cols: list[Col],
-        row: Row,
-        *,
-        inside: int = 4,
-        outside: int = 40,
-) -> list[BBox]:
-    """Merge character boxes that are near to each other.
-
-    We are finding boxes around each character. However, there are a lot of missing
-    pixels in the characters and the profile projection method relies on finding
-    blank columns to delimit the characters. This function merges nearby boxes to
-    join broken characters into a single box.
-    """
-    boxes: list[BBox] = [BBox(cols[0].left, row.top, cols[0].right, row.bottom)]
-
-    for col in cols[1:]:
-        prev_left, prev_right = boxes[-1].left, boxes[-1].right
-
-        if (col.left - prev_right) <= inside and (col.right - prev_left) <= outside:
-            boxes.pop()
-            boxes.append(BBox(prev_left, row.top, col.right, row.bottom))
-        else:
-            boxes.append(BBox(col.left, row.top, col.right, row.bottom))
+        box = BBox(col.low, row.low, col.high, row.high)
+        char = binary_image.crop(box)
+        data = np.array(char) // ON
+        pixels = np.sum(data)
+        if pixels > min_pixels:
+            boxes.append(box)
 
     return boxes
-
-
-def chop_image(
-        bin_image: Image,
-        axis: int = 1,
-        threshold: int = 20,
-) -> list[ThresholdBreak]:
-    """Chop the image into rows or columns."""
-    data = np.array(bin_image).copy() / 255
-    proj = data.sum(axis=axis)
-    proj = proj > threshold
-    proj = proj.astype(int)
-
-    prev = np.insert(proj[:-1], 0, 0)
-    curr = np.insert(proj[1:], 0, 0)
-    where = np.where(curr != prev)[0]
-    where = where.tolist()
-
-    splits = np.array_split(proj, where)
-
-    where = where if where[0] == 0 else ([0] + where)
-    where = [ThresholdBreak(w, s[0]) for w, s in zip(where, splits)]
-
-    return where
-
-
-def line_pairs(
-        threshold_breaks: list[ThresholdBreak],
-        padding: int = 1,
-) -> tuple[list[int], list[int]]:
-    """Convert to pairs of lines (top, bottom) or (left, right)."""
-    starts = [w.line - padding for w in threshold_breaks if w.type == 1]
-    ends = [w.line + padding for w in threshold_breaks if w.type == 0][1:]
-    return starts, ends

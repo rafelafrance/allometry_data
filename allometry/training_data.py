@@ -83,7 +83,7 @@ class TrainingData(Dataset):
         chars = [params.get(c, c)[-1] for c in chars]
         chars = ''.join(chars)
 
-        size_high = params.get('pt', 42)
+        size_high = params.get('pt', 42) + 1
         size_low = size_high - 4
         font_size = np.random.randint(size_low, size_high)
 
