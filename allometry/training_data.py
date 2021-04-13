@@ -1,5 +1,7 @@
 """Generate training data."""
 
+from pathlib import Path
+
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
@@ -67,7 +69,7 @@ class TrainingData(Dataset):
         """Return the length given in the constructor."""
         return self.length
 
-    def __getitem__(self, _) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, _: int) -> tuple[torch.Tensor, int]:
         """Get a training image for a character and its target class."""
         font_path = choice(FONTS)
 
@@ -79,7 +81,7 @@ class TrainingData(Dataset):
         data = TF.to_tensor(image)
         return data, CHAR_TO_IDX[chars[1]]
 
-    def char_image(self, chars, font_path, filter_='median'):
+    def char_image(self, chars: str, font_path: Path, filter_: str = 'median') -> Image:
         """Draw an image of one character."""
         params = self.font_params.get(font_path.stem, {})
 
@@ -115,14 +117,14 @@ class TrainingData(Dataset):
         return image
 
 
-def custom_filter(image):
+def custom_filter(image: Image) -> Image:
     """Degrade image in realistic way."""
     image = image.filter(ImageFilter.Kernel(
         size=(3, 3), kernel=(1, 0, 1, 0, 0, 0, 1, 0, 1)))
     return image
 
 
-def filter_image(image, image_filter):
+def filter_image(image: Image, image_filter: str) -> Image:
     """Use filters to extend the effect of the added snow."""
     if image_filter == 'max':
         image = image.filter(ImageFilter.MaxFilter())
@@ -143,7 +145,7 @@ def filter_image(image, image_filter):
     return image
 
 
-def add_soot(image, fract=0.1):
+def add_soot(image: Image, fract: float = 0.1) -> Image:
     """Add soot (black pixels) to the image."""
     data = np.array(image).copy()
 
