@@ -19,6 +19,13 @@ MODELS = {
 }
 
 
+def continue_training(model_dir, model_state, model):
+    """Continue training the model."""
+    if model_state:
+        return load_model_state(model_dir / model_state, model)
+    return 1
+
+
 def load_model_state(model_state, model):
     """Load a saved model."""
     start = 1

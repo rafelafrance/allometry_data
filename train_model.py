@@ -15,7 +15,7 @@ import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
-from allometry.model_util import MODELS, get_model, load_model_state
+from allometry.model_util import MODELS, get_model, continue_training
 from allometry.training_data import TrainingData
 from allometry.util import Score, finished, started
 
@@ -28,7 +28,7 @@ def train(args):
     name = f'{name}_{args.suffix}' if args.suffix else name
 
     model = get_model(args.model_arch)
-    epoch_start = load_model_state(args.model_dir / args.model_state, model)
+    epoch_start = continue_training(args.model_dir, args.model_state, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
