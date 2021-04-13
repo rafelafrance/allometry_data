@@ -7,7 +7,7 @@ import textwrap
 from datetime import date
 from os import makedirs
 from pathlib import Path
-from random import randint, seed
+from random import randint
 
 import numpy as np
 import torch
@@ -23,11 +23,6 @@ from allometry.util import Score, finished, started
 def train(args):
     """Train the neural net."""
     make_dirs(args)
-
-    if args.seed is not None:
-        torch.manual_seed(args.seed)
-        np.random.seed(args.seed)
-        seed(args.seed)
 
     name = f'{args.model_arch}_{date.today().isoformat()}'
     name = f'{name}_{args.suffix}' if args.suffix else name
@@ -56,7 +51,7 @@ def train(args):
         train_batches(model, device, criterion, train_loader, optimizer, score)
         score_batches(model, device, criterion, score_loader, score)
 
-        log_score(score, best_score, epoch)
+        log_score(score, best_score, best_loss, epoch)
         best_score, best_loss = save_state(
             model, args.model_dir, name, epoch, score, best_score, best_loss)
 
@@ -91,15 +86,15 @@ def score_batches(model, device, criterion, loader, score):
             score.correct_1.append((idx == y).sum().item())
 
 
-def log_score(score, best_score, epoch):
+def log_score(score, best_score, best_loss, epoch):
     """Clean up after the scoring epoch."""
     acc_flag = '*' if score.better_than(best_score) else ''
-    score_flag = '*' if score.avg_score_loss < best_score.avg_score_loss else ' '
+    score_flag = '*' if score.avg_score_loss < best_loss.avg_score_loss else ' '
 
     logging.info(f'Epoch: {epoch:3d} Average loss '
                  f'(train: {score.avg_train_loss:0.8f},'
                  f' score: {score.avg_score_loss:0.8f}) {score_flag} '
-                 f'Accuracy: {score.top_1:6.4f} % {acc_flag}')
+                 f'Accuracy: {score.top_1:7.4f} % {acc_flag}')
 
 
 def save_state(model, model_dir, name, epoch, score, best_score, best_loss):
@@ -107,12 +102,12 @@ def save_state(model, model_dir, name, epoch, score, best_score, best_loss):
     model.state_dict()['epoch'] = epoch
 
     if score.better_than(best_score):
-        path = model_dir / f'best_{name}.pth'
+        path = model_dir / f'{name}.pth'
         torch.save(model.state_dict(), path)
         best_score = score
 
     if score.avg_score_loss < best_loss.avg_score_loss:
-        path = model_dir / f'best_loss_{name}.pth'
+        path = model_dir / f'{name}_loss.pth'
         torch.save(model.state_dict(), path)
         best_loss = score
 
@@ -200,10 +195,6 @@ def parse_args():
         '--batch-size', type=int, default=16,
         help="""Input batch size. (default: %(default)s)""")
 
-    # arg_parser.add_argument(
-    #     '--top-k', type=int, default=5,
-    #     help="""Get the top K predictions. (default: %(default)s)""")
-
     arg_parser.add_argument(
         '--workers', type=int, default=4,
         help="""Number of workers for loading data. (default: %(default)s)""")
@@ -216,7 +207,7 @@ def parse_args():
 
     args = arg_parser.parse_args()
 
-    # Wee need something for the scoring pass
+    # Wee need something for the data loaders
     args.seed = args.seed if args.seed is not None else randint(0, 4_000_000_000)
 
     return args

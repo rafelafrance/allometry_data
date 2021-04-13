@@ -12,15 +12,16 @@ from scipy import signal
 
 from allometry.const import BBox, CONTEXT_SIZE, ON, OFF
 
-Pair = namedtuple('Row', 'low high')
+Pair = namedtuple('Pair', 'low high')
 
 PADDING = 2
 BIN_THRESHOLD = 230
 ROW_THRESHOLD = 40
-VERT_DIST = 40
+VERT_DIST = 35
 HORIZ_DIST = 30
 MIN_PIXELS = 40
 FAT_ROW = 60
+THIN_ROW = 40
 DESKEW_RANGE = (-0.2, 0.21, 0.01)
 
 
@@ -51,6 +52,7 @@ class AllometrySheet(Dataset):
         horiz_dist = kwargs.get('horiz_dist', HORIZ_DIST)
         min_pixels = kwargs.get('min_pixels', MIN_PIXELS)
         fat_row = kwargs.get('fat_row', FAT_ROW)
+        thin_row = kwargs.get('thin_row', THIN_ROW)
         deskew_range = kwargs.get('deskew_range', DESKEW_RANGE)
 
         self.image = Image.open(path).convert('L')
@@ -75,6 +77,7 @@ class AllometrySheet(Dataset):
             self.binary,
             padding=padding,
             vert_dist=vert_dist,
+            thin_row=thin_row,
             row_threshold=row_threshold,
         )
 
@@ -177,6 +180,7 @@ def find_rows(
         *,
         padding: int = PADDING,
         vert_dist: int = VERT_DIST,
+        thin_row: int = THIN_ROW,
         row_threshold: int = ROW_THRESHOLD,
 ) -> list[Pair]:
     """Find rows in the image."""
@@ -195,7 +199,18 @@ def find_rows(
     bots = peaks[1]['left_edges'][1:]
     pairs = [Pair(t-padding, b+padding) for t, b in zip(tops, bots)]
 
-    return pairs
+    rows = [pairs[0]]
+
+    for curr in pairs[1:]:
+        min_low = min(curr.low, rows[-1].low)
+        max_high = max(curr.high, rows[-1].high)
+        if max_high - min_low <= thin_row:
+            rows.pop()
+            rows.append(Pair(min_low, max_high))
+        else:
+            rows.append(curr)
+
+    return rows
 
 
 def find_chars(

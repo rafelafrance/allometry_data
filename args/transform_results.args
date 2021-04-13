@@ -1,3 +1,2 @@
---jsonl-dir=./output/Biomass_Fish_Families_FamilyProgram/
---output-dir=./output/txt/Biomass_Fish_Families_FamilyProgram/
---format=text
+--jsonl-dir=./output/resnext101_2021-04-08_context_c/Biomass_Fish_Families_FamilyProgram/jsonl
+--text-dir=./output/resnext101_2021-04-08_context_c/Biomass_Fish_Families_FamilyProgram/txt

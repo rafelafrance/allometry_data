@@ -113,8 +113,8 @@ def parse_args():
             (default: %(default)s)""")
 
     arg_parser.add_argument(
-        '--output-dir', required=True, type=Path,
-        help="""Where to put the output data.""")
+        '--jsonl-dir', required=True, type=Path,
+        help="""Where to put the output JSONL data.""")
 
     arg_parser.add_argument(
         '--model-state', required=True, help="""Path to the model to use.""")
