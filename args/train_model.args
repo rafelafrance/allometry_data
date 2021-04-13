@@ -7,4 +7,4 @@
 --learning-rate=0.001
 --seed=5698
 --train-size=10000
---score-size=20000
+--score-size=10000

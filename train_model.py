@@ -49,6 +49,8 @@ def train(args):
     best_loss = Score()
 
     for epoch in range(epoch_start, epoch_end):
+        np.random.seed(args.seed + epoch)
+
         score = Score()
 
         train_batches(model, device, criterion, train_loader, optimizer, score)
@@ -134,7 +136,7 @@ def get_loaders(args):
         score_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
-        worker_init_fn=lambda w: np.random.seed(args.seed + w),
+        worker_init_fn=lambda w: np.random.seed(np.random.get_state()[1][0] + w),
     )
 
     return train_loader, score_loader

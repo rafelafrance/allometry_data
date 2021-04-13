@@ -2,5 +2,5 @@
 --rotate=90
 --model-arch=resnext101
 --output-dir=./output/Biomass_Fish_Families_FamilyProgram
---model-state=./data/model/best_resnext101_2021-04-08_context_c.pth
+--model-state=./data/model/best_loss_resnext101_2021-04-13_random_a.pth
 --batch-size=50

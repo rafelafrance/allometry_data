@@ -1,0 +1,3 @@
+--jsonl-dir=./output/Biomass_Fish_Families_FamilyProgram/
+--output-dir=./output/txt/Biomass_Fish_Families_FamilyProgram/
+--format=text
