@@ -37,11 +37,11 @@ class AllometrySheet(Dataset):
         """Dissect a image of an allometry sheet and find all of its characters."""
         padding = kwargs.get('padding', 2)  # How many pixels border each character
         bin_threshold = kwargs.get('bin_threshold', 230)  # Binary threshold
-        vert_dist = kwargs.get('vert_dist', 40)
         row_threshold = kwargs.get('row_threshold', 40)
+        vert_dist = kwargs.get('vert_dist', 40)
         horiz_dist = kwargs.get('horiz_dist', 30)
         min_pixels = kwargs.get('min_pixels', 40)
-        fat_row = kwargs.get('fat_row', 40)
+        fat_row = kwargs.get('fat_row', 60)
         deskew_range = kwargs.get('deskew_range', (-0.2, 0.21, 0.01))
 
         self.image = Image.open(path).convert('L')
@@ -122,18 +122,19 @@ class AllometrySheet(Dataset):
 
 def deskew_image(
         binary_image: Image,
-        *,
         deskew_range: tuple[float, float, float],
-        fat_row: int = 60,
-        row_threshold: int = 20,
+        *,
         padding: int = 1,
+        fat_row: int = 60,
         vert_dist: int = 40,
+        row_threshold: int = 20,
 ) -> Image:
     """Fine tune the rotation of a binary image."""
     rows = find_rows(
         binary_image,
         padding=padding,
-        row_threshold=row_threshold, vert_dist=vert_dist,
+        vert_dist=vert_dist,
+        row_threshold=row_threshold,
     )
     fat_rows = sum(1 for r in rows if r.low - r.high > fat_row)
 
@@ -141,16 +142,16 @@ def deskew_image(
         return binary_image
 
     thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
-    best = (thin_rows, binary_image, rows)
+    best = (thin_rows, binary_image)
 
     for angle in np.arange(*deskew_range):
         rotated = rotate_image(binary_image, angle)
         rows = find_rows(rotated, row_threshold=row_threshold, padding=padding)
         thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
         if thin_rows > best[0]:
-            best = (thin_rows, rotated, rows)
+            best = (thin_rows, rotated)
 
-    return best[1], best[2]
+    return best[1]
 
 
 def rotate_image(image: Image, angle: float) -> Image:
