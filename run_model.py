@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a model on real allometry sheets."""
+"""Run a model on real allometry sheets and save the raw output."""
 
 import argparse
 import json
@@ -51,11 +51,13 @@ def main(args):
 
 def save_batch(sheet, boxes, indices, scores):
     """Save the current batch of characters."""
+    keys = ['left', 'top', 'right', 'bottom']
     for box, score, index in zip(boxes, scores, indices):
         index = index.tolist()
+        box = {k: v for k, v in zip(keys, box.tolist())}
         sheet.append({
             'char': IDX_TO_CHAR[index[0]],
-            'box': box.tolist(),
+            'box': box,
             'indices': index,
             'scores': score.tolist(),
         })

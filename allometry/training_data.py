@@ -4,11 +4,14 @@ import numpy as np
 import torch
 import torchvision.transforms.functional as TF
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from numpy.random import choice, randint
 from torch.utils.data import Dataset
 
-from allometry.characters import (CHAR_TO_IDX, float_chars, int_chars, single_chars,
+from allometry.characters import (CHAR_TO_IDX, float_chars, int_chars, repeated_chars,
                                   word_chars)
-from allometry.const import CONTEXT_SIZE, FONTS, ImageSize
+from allometry.const import CONTEXT_SIZE, FONTS_DIR, ImageSize, OFF, ON
+
+FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
 
 
 class TrainingData(Dataset):
@@ -51,9 +54,9 @@ class TrainingData(Dataset):
         'scoreboard': {'pt': 48, '.': '.·•'},
     }
 
-    funcs = ([float_chars] * 20
-             + [word_chars] * 10
-             + [single_chars] * 5
+    funcs = ([float_chars] * 5
+             + [word_chars] * 2
+             + [repeated_chars] * 2
              + [int_chars])
 
     def __init__(self, length):
@@ -66,9 +69,9 @@ class TrainingData(Dataset):
 
     def __getitem__(self, _) -> tuple[torch.Tensor, int]:
         """Get a training image for a character and its target class."""
-        font_path = np.random.choice(FONTS)
+        font_path = choice(FONTS)
 
-        func = np.random.choice(self.funcs)
+        func = choice(self.funcs)
         chars = func()
 
         image = self.char_image(chars, font_path)
@@ -85,7 +88,7 @@ class TrainingData(Dataset):
 
         size_high = params.get('pt', 42) + 1
         size_low = size_high - 4
-        font_size = np.random.randint(size_low, size_high)
+        font_size = randint(size_low, size_high)
 
         font = ImageFont.truetype(str(font_path), size=font_size)
         size = font.getsize(chars)
@@ -107,7 +110,7 @@ class TrainingData(Dataset):
         filter_ = params.get('filter', filter_)
         image = filter_image(image, filter_)
 
-        image = image.point(lambda x: 255 if x > 128 else 0)
+        image = image.point(lambda x: ON if x > 128 else OFF)
 
         return image
 

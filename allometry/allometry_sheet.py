@@ -10,9 +10,18 @@ from PIL import Image
 from torch.utils.data import Dataset
 from scipy import signal
 
-from allometry.const import BBox, CONTEXT_SIZE, ON
+from allometry.const import BBox, CONTEXT_SIZE, ON, OFF
 
 Pair = namedtuple('Row', 'low high')
+
+PADDING = 2
+BIN_THRESHOLD = 230
+ROW_THRESHOLD = 40
+VERT_DIST = 40
+HORIZ_DIST = 30
+MIN_PIXELS = 40
+FAT_ROW = 60
+DESKEW_RANGE = (-0.2, 0.21, 0.01)
 
 
 class AllometrySheet(Dataset):
@@ -35,14 +44,14 @@ class AllometrySheet(Dataset):
 
     def __init__(self, path: Path, rotate: int = 0, **kwargs):
         """Dissect a image of an allometry sheet and find all of its characters."""
-        padding = kwargs.get('padding', 2)  # How many pixels border each character
-        bin_threshold = kwargs.get('bin_threshold', 230)  # Binary threshold
-        row_threshold = kwargs.get('row_threshold', 40)
-        vert_dist = kwargs.get('vert_dist', 40)
-        horiz_dist = kwargs.get('horiz_dist', 30)
-        min_pixels = kwargs.get('min_pixels', 40)
-        fat_row = kwargs.get('fat_row', 60)
-        deskew_range = kwargs.get('deskew_range', (-0.2, 0.21, 0.01))
+        padding = kwargs.get('padding', PADDING)
+        bin_threshold = kwargs.get('bin_threshold', BIN_THRESHOLD)
+        row_threshold = kwargs.get('row_threshold', ROW_THRESHOLD)
+        vert_dist = kwargs.get('vert_dist', VERT_DIST)
+        horiz_dist = kwargs.get('horiz_dist', HORIZ_DIST)
+        min_pixels = kwargs.get('min_pixels', MIN_PIXELS)
+        fat_row = kwargs.get('fat_row', FAT_ROW)
+        deskew_range = kwargs.get('deskew_range', DESKEW_RANGE)
 
         self.image = Image.open(path).convert('L')
 
@@ -51,7 +60,7 @@ class AllometrySheet(Dataset):
             self.image = self.image.rotate(rotate, expand=True, fillcolor='white')
 
         # Convert to a binary image with white text on black background
-        self.binary = self.image.point(lambda x: 255 if x < bin_threshold else 0)
+        self.binary = self.image.point(lambda x: ON if x < bin_threshold else OFF)
 
         self.binary = deskew_image(
             self.binary,
@@ -124,10 +133,10 @@ def deskew_image(
         binary_image: Image,
         deskew_range: tuple[float, float, float],
         *,
-        padding: int = 1,
-        fat_row: int = 60,
-        vert_dist: int = 40,
-        row_threshold: int = 20,
+        padding: int = PADDING,
+        fat_row: int = FAT_ROW,
+        vert_dist: int = VERT_DIST,
+        row_threshold: int = ROW_THRESHOLD,
 ) -> Image:
     """Fine tune the rotation of a binary image."""
     rows = find_rows(
@@ -166,9 +175,9 @@ def rotate_image(image: Image, angle: float) -> Image:
 def find_rows(
         binary_image: Image,
         *,
-        padding: int = 1,
-        row_threshold: int = 40,
-        vert_dist: int = 40,
+        padding: int = PADDING,
+        vert_dist: int = VERT_DIST,
+        row_threshold: int = ROW_THRESHOLD,
 ) -> list[Pair]:
     """Find rows in the image."""
     data = np.array(binary_image) // ON
@@ -193,9 +202,9 @@ def find_chars(
         binary_image: Image,
         row: Pair,
         *,
-        padding: int = 2,
-        horiz_dist: int = 30,
-        min_pixels: int = 40,
+        padding: int = PADDING,
+        horiz_dist: int = HORIZ_DIST,
+        min_pixels: int = MIN_PIXELS,
 ) -> list[BBox]:
     """Find all of the characters in a row."""
     line = binary_image.crop((0, row.low, binary_image.size[0], row.high))

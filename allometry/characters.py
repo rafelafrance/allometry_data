@@ -1,13 +1,16 @@
 """Generators for characters and surrounding context."""
 
 import string
-from random import choice, randint, random, uniform
+
+from numpy.random import choice, randint, random, uniform
 
 TINY_PUNCT = '.-,;'
 OTHER_PUNCT = """$%*()<=>+/:#&"""
 CHARS = sorted(string.digits + string.ascii_uppercase + TINY_PUNCT + OTHER_PUNCT)
 CHAR_TO_IDX = {c: i for i, c in enumerate(CHARS)}
 IDX_TO_CHAR = {v: k for k, v in CHAR_TO_IDX.items()}
+
+REPEATED = '*-'
 
 ALNUM = string.digits + string.ascii_uppercase
 
@@ -29,9 +32,10 @@ def float_chars(*, low=-2.0, high=2.0, precision=8, left=1, right=1):
     return get_chars(word, left=left, right=right)
 
 
-def single_chars(*, left=1, right=1):
-    """Generate words and pick some characters out of them."""
-    word = choice(CHARS)
+def repeated_chars(*, left=1, right=1):
+    """Generate repeated chars."""
+    word = [choice(REPEATED)] * randint(1, 10)
+    word = ''.join(word)
     return get_chars(word, left=left, right=right)
 
 
