@@ -33,7 +33,7 @@ def train(args):
     name = f'{name}_{args.suffix}' if args.suffix else name
 
     model = get_model(args.model_arch)
-    epoch_start = load_model_state(args.model_dir, args.model_state, model)
+    epoch_start = load_model_state(args.model_dir / args.model_state, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)

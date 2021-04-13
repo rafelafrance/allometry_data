@@ -19,12 +19,11 @@ MODELS = {
 }
 
 
-def load_model_state(model_dir, model_state, model):
+def load_model_state(model_state, model):
     """Load a saved model."""
     start = 1
     if model_state:
-        path = model_dir / model_state
-        state = torch.load(path)
+        state = torch.load(model_state)
         model.load_state_dict(state)
         if model.state_dict().get('epoch'):
             start = model.state_dict()['epoch'] + 1
