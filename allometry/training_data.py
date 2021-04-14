@@ -10,7 +10,7 @@ from numpy.random import choice, randint
 from torch.utils.data import Dataset
 
 from allometry.characters import (CHAR_TO_IDX, float_chars, int_chars, repeated_chars,
-                                  word_chars)
+                                  word_chars, TINY_PUNCT)
 from allometry.const import CONTEXT_SIZE, FONTS_DIR, ImageSize, OFF, ON
 
 FONTS = sorted(FONTS_DIR.glob('*/*.ttf'))
@@ -31,13 +31,13 @@ class TrainingData(Dataset):
         'CutiveMono-Regular': {'pt': 52, '.': '.·•'},
         'DOTMATRI': {'pt': 54},
         'DOTMBold': {'pt': 48, 'filter': 'custom-median'},
-        'DottyRegular-vZOy': {'pt': 72},
+        'DottyRegular-vZOy': {'pt': 72, 'soot_sm': 0.2},
         'EHSMB': {'pt': 48},
         'ELEKTRA_': {'pt': 54, '.': '.•'},
         'FiraMono-Bold': {'.': '.·•∙●', 'filter': 'custom-median'},
         'IBMPlexMono-Bold': {'.': '.·•', 'filter': 'custom-median'},
         'Merchant Copy Doublesize': {'pt': 44, 'filter': 'custom-median'},
-        'Merchant Copy Wide': {'pt': 48, 'filter': 'custom-median'},
+        'Merchant Copy Wide': {'pt': 48, 'filter': 'custom-median', 'soot_sm': 0.2},
         'Merchant Copy': {'pt': 72},
         'Minecart_LCD': {'pt': 48},
         'OcrB2': {'pt': 48, 'filter': 'custom-median', '.': '.·•∙'},
@@ -53,7 +53,7 @@ class TrainingData(Dataset):
         'XanhMono-Regular': {'pt': 48},
         'fake-receipt': {'pt': 48},
         'hydrogen': {'pt': 54},
-        'scoreboard': {'pt': 48, '.': '.·•'},
+        'scoreboard': {'pt': 48, '.': '.·•', 'soot_sm': 0.2},
     }
 
     funcs = ([float_chars] * 5
@@ -83,6 +83,7 @@ class TrainingData(Dataset):
 
     def char_image(self, chars: str, font_path: Path, filter_: str = 'median') -> Image:
         """Draw an image of one character."""
+        target = chars[1]
         params = self.font_params.get(font_path.stem, {})
 
         chars = [params.get(c, c)[-1] for c in chars]
@@ -107,7 +108,9 @@ class TrainingData(Dataset):
         draw = ImageDraw.Draw(image)
         draw.text((left, top), chars, font=font, fill='white')
 
-        image = add_soot(image, 0.3)
+        soot = params.get('soot', 0.3)
+        soot = params.get('soot_sm', soot) if target in TINY_PUNCT else soot
+        image = add_soot(image, soot)
 
         filter_ = params.get('filter', filter_)
         image = filter_image(image, filter_)

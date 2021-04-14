@@ -4,6 +4,6 @@
 --batch-size=50
 --epochs=500
 --learning-rate=0.0001
---seed=5699
+--seed=5692
 --train-size=10000
 --score-size=10000

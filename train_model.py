@@ -28,7 +28,7 @@ def train(args):
     name = f'{name}_{args.suffix}' if args.suffix else name
 
     model = get_model(args.model_arch)
-    epoch_start = continue_training(args.model_dir, args.model_state, model)
+    epoch_start = continue_training(args.model_dir, args.trained_model, model)
     epoch_end = epoch_start + args.epochs
 
     device = torch.device(args.device)
@@ -164,7 +164,7 @@ def parse_args():
         '--model-dir', type=Path, help="""Save models to this directory.""")
 
     arg_parser.add_argument(
-        '--model-state',
+        '--trained-model',
         help="""Load this model state to continue training the model. The file must
             be in the --model-dir.""")
 

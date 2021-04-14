@@ -19,18 +19,18 @@ MODELS = {
 }
 
 
-def continue_training(model_dir, model_state, model):
+def continue_training(model_dir, trained_model, model):
     """Continue training the model."""
-    if model_state:
-        return load_model_state(model_dir / model_state, model)
+    if trained_model:
+        return load_model_state(model_dir / trained_model, model)
     return 1
 
 
-def load_model_state(model_state, model):
+def load_model_state(trained_model, model):
     """Load a saved model."""
     start = 1
-    if model_state:
-        state = torch.load(model_state)
+    if trained_model:
+        state = torch.load(trained_model)
         model.load_state_dict(state)
         if model.state_dict().get('epoch'):
             start = model.state_dict()['epoch'] + 1

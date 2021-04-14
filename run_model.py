@@ -22,7 +22,7 @@ def main(args):
     make_dirs(args)
 
     model = get_model(args.model_arch)
-    load_model_state(args.model_state, model)
+    load_model_state(args.trained_model, model)
 
     device = torch.device(args.device)
     model.to(device)
@@ -46,7 +46,7 @@ def main(args):
 
             save_batch(sheet, boxes, indices, scores)
 
-        save_sheet(args.output_dir, image_path, sheet)
+        save_sheet(args.jsonl_dir, image_path, sheet)
 
 
 def save_batch(sheet, boxes, indices, scores):
@@ -63,9 +63,9 @@ def save_batch(sheet, boxes, indices, scores):
         })
 
 
-def save_sheet(output_dir, image_path, sheet):
+def save_sheet(jsonl_dir, image_path, sheet):
     """Save the entire sheet as a JSON lines file."""
-    path = output_dir / (image_path.stem + '.jsonl')
+    path = jsonl_dir / (image_path.stem + '.jsonl')
     with open(path, 'w') as output_file:
         for rec in sheet:
             json.dump(rec, output_file)
@@ -84,8 +84,8 @@ def get_loader(args, path):
 
 def make_dirs(args):
     """Create output directories."""
-    if args.output_dir:
-        makedirs(args.output_dir, exist_ok=True)
+    if args.jsonl_dir:
+        makedirs(args.jsonl_dir, exist_ok=True)
 
 
 def parse_args():
@@ -117,7 +117,7 @@ def parse_args():
         help="""Where to put the output JSONL data.""")
 
     arg_parser.add_argument(
-        '--model-state', required=True, help="""Path to the model to use.""")
+        '--trained-model', required=True, help="""Path to the model to use.""")
 
     arg_parser.add_argument(
         '--model-arch', default='resnet50', choices=list(MODELS.keys()),

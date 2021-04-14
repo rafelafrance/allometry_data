@@ -1,2 +1,2 @@
---jsonl-dir=./output/resnext101_2021-04-08_context_c/Biomass_Fish_Families_FamilyProgram/jsonl
---text-dir=./output/resnext101_2021-04-08_context_c/Biomass_Fish_Families_FamilyProgram/txt
+--jsonl-dir=./output/wide_resnet101_2_2021-04-13_a/Biomass_Fish_Families_FamilyProgram/jsonl
+--text-dir=./output/wide_resnet101_2_2021-04-13_a/Biomass_Fish_Families_FamilyProgram/txt
