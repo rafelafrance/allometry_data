@@ -107,7 +107,7 @@ class TrainingData(Dataset):
         draw = ImageDraw.Draw(image)
         draw.text((left, top), chars, font=font, fill='white')
 
-        image = add_soot(image, 0.2)
+        image = add_soot(image, 0.3)
 
         filter_ = params.get('filter', filter_)
         image = filter_image(image, filter_)

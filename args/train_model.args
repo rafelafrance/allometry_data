@@ -1,6 +1,6 @@
 --model-dir=./data/model
 --model-arch=wide_resnet101_2
---suffix=a
+--suffix=b
 --batch-size=50
 --epochs=500
 --learning-rate=0.0001
