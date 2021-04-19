@@ -1,6 +1,6 @@
---image-dir=./data/allometry_sheets/Biomass_Fish_Families_FamilyProgram
+--sheet-dir=./data/allometry_sheets/Biomass_Fish_Families_FamilyProgram
 --rotate=90
---model-arch=wide_resnet101_2
---trained-model=wide_resnet101_2_2021-04-13_a.pth
 --batch-size=50
---jsonl-dir=./output/wide_resnet101_2_2021-04-13_a/Biomass_Fish_Families_FamilyProgram/jsonl
+--model-arch=wide_resnet101_2
+--trained-model=./data/model/wide_resnet101_2_2021-04-14_b.pth
+--jsonl-dir=./output/wide_resnet101_2_2021-04-14_b/Biomass_Fish_Families_FamilyProgram/jsonl

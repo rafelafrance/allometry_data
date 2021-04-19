@@ -5,11 +5,11 @@ if [[ ! -z "$VIRTUAL_ENV" ]]; then
   exit 1
 fi
 
-rm -rf venv
+rm -rf .venv
 
-virtualenv -p python3.9 venv
+virtualenv -p python3.9 .venv
 
-source ./venv/bin/activate
+source ./.venv/bin/activate
 
 python -m pip install --upgrade pip setuptools wheel
 if [ -f requirements.txt ]; then pip install -r requirements.txt; fi

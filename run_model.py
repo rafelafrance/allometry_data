@@ -29,7 +29,7 @@ def main(args):
 
     model.eval()
 
-    for image_path in sorted(args.image_dir.glob(f'*.{args.image_suffix}')):
+    for image_path in sorted(args.sheet_dir.glob(f'*.{args.image_suffix}')):
         logging.info(f'{image_path}')
 
         sheet = []
@@ -53,12 +53,9 @@ def save_batch(sheet, boxes, indices, scores):
     """Save the current batch of characters."""
     keys = ['left', 'top', 'right', 'bottom']
     for box, score, index in zip(boxes, scores, indices):
-        index = index.tolist()
-        box = {k: v for k, v in zip(keys, box.tolist())}
         sheet.append({
-            'char': IDX_TO_CHAR[index[0]],
-            'box': box,
-            'indices': index,
+            'chars': [IDX_TO_CHAR[i] for i in index.tolist()],
+            'box': {k: v for k, v in zip(keys, box.tolist())},
             'scores': score.tolist(),
         })
 
@@ -96,9 +93,9 @@ def parse_args():
         fromfile_prefix_chars='@')
 
     arg_parser.add_argument(
-        '--image-dir', required=True, type=Path,
-        help="""The directory containing the images to convert. They
-            should all have the same orientation.""")
+        '--sheet-dir', required=True, type=Path,
+        help="""The directory containing the images of the allometry sheets to convert.
+            They should all have the same orientation.""")
 
     arg_parser.add_argument(
         '--image-suffix', default='tif', help="""The suffix for the images.""")

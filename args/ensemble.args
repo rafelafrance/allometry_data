@@ -1,0 +1,8 @@
+--jsonl-dir=output/resnet152_2021-04-14_a/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/resnet152_2021-04-14_a_loss/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/resnext101_2021-04-08_context_c/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/resnext101_2021-04-13_random_a/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/resnext101_2021-04-13_random_a_loss/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/wide_resnet101_2_2021-04-13_a/Biomass_Fish_Families_FamilyProgram/jsonl
+--jsonl-dir=output/wide_resnet101_2_2021-04-14_b/Biomass_Fish_Families_FamilyProgram/jsonl
+--ensemble-dir=output/ensemble_1/Biomass_Fish_Families_FamilyProgram/jsonl

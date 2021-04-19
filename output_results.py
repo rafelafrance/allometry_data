@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transform the raw output from run_model.py into something researcher can use."""
+"""Transform the raw output from the models into something researchers can use."""
 
 import argparse
 import json
@@ -16,8 +16,8 @@ OUTSIDE = 42
 HEIGHT = 48
 
 
-def transform(args):
-    """Transform the data."""
+def output(args):
+    """Output the sheets."""
     make_dirs(args)
 
     jsonl_paths = args.jsonl_dir.glob('*.jsonl')
@@ -60,7 +60,7 @@ def as_text(args, jsonl_path, lines):
                 space = ' ' * (round((curr_left - prev_left) / OUTSIDE) - 1)
                 if space:
                     text.append(space)
-                text.append(char['char'])
+                text.append(char['chars'][0])
                 prev_left = curr_left
 
             line = ''.join(text)
@@ -78,7 +78,7 @@ def make_dirs(args):
 
 def parse_args():
     """Process command-line arguments."""
-    description = """Convert raw model output into something researchers can use."""
+    description = """Output the raw model output into a form researchers can use."""
     arg_parser = argparse.ArgumentParser(
         description=textwrap.dedent(description),
         fromfile_prefix_chars='@')
@@ -99,6 +99,6 @@ if __name__ == '__main__':
     started()
 
     ARGS = parse_args()
-    transform(ARGS)
+    output(ARGS)
 
     finished()

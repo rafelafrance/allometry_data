@@ -8,21 +8,21 @@ import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
-from scipy import signal
 
-from allometry.const import BBox, CONTEXT_SIZE, ON, OFF
+from allometry.const import BBox, CONTEXT_SIZE, OFF, ON
 
 Pair = namedtuple('Pair', 'low high')
+Where = namedtuple('Where', 'line type')
 
-PADDING = 2
-BIN_THRESHOLD = 230
-ROW_THRESHOLD = 40
-VERT_DIST = 35
-HORIZ_DIST = 30
-MIN_PIXELS = 40
-FAT_ROW = 60
-THIN_ROW = 40
-DESKEW_RANGE = (-0.2, 0.21, 0.01)
+PADDING = 2  # How many pixels to pad a character
+BIN_THRESHOLD = 230  # A pixel is considered "on" if its values is at least this
+ROW_THRESHOLD = 40  # Max number of "on" pixels for a row to be considered empty
+COL_THRESHOLD = 0  # Max number of "on" pixels for a column to be considered empty
+INSIDE = 4  # Only merge boxes if they are this close
+OUTSIDE = 40  # Only merge boxes if they will not make a box this fat
+DESKEW_RANGE = (-0.2, 0.21, 0.01)  # Rotations to check when deskewing
+FAT_ROW = 60  # Minimize this when deskewing
+MIN_PIXELS = 40  # A character box must have this many "on" pixels
 
 
 class AllometrySheet(Dataset):
@@ -43,18 +43,8 @@ class AllometrySheet(Dataset):
        "context" (surrounding characters).
     """
 
-    def __init__(self, path: Path, rotate: int = 0, **kwargs):
+    def __init__(self, path: Path, rotate: int = 0):
         """Dissect a image of an allometry sheet and find all of its characters."""
-        padding = kwargs.get('padding', PADDING)
-        bin_threshold = kwargs.get('bin_threshold', BIN_THRESHOLD)
-        row_threshold = kwargs.get('row_threshold', ROW_THRESHOLD)
-        vert_dist = kwargs.get('vert_dist', VERT_DIST)
-        horiz_dist = kwargs.get('horiz_dist', HORIZ_DIST)
-        min_pixels = kwargs.get('min_pixels', MIN_PIXELS)
-        fat_row = kwargs.get('fat_row', FAT_ROW)
-        thin_row = kwargs.get('thin_row', THIN_ROW)
-        deskew_range = kwargs.get('deskew_range', DESKEW_RANGE)
-
         self.image = Image.open(path).convert('L')
 
         # Orient the image by rotating 0, 90, 180, or 270 degrees
@@ -62,36 +52,11 @@ class AllometrySheet(Dataset):
             self.image = self.image.rotate(rotate, expand=True, fillcolor='white')
 
         # Convert to a binary image with white text on black background
-        self.binary = self.image.point(lambda x: ON if x < bin_threshold else OFF)
+        self.binary = self.image.point(lambda x: ON if x < BIN_THRESHOLD else OFF)
+        self.binary = deskew_image(self.binary)
 
-        self.binary = deskew_image(
-            self.binary,
-            padding=padding,
-            fat_row=fat_row,
-            vert_dist=vert_dist,
-            row_threshold=row_threshold,
-            deskew_range=deskew_range,
-        )
-
-        rows = find_rows(
-            self.binary,
-            padding=padding,
-            vert_dist=vert_dist,
-            thin_row=thin_row,
-            row_threshold=row_threshold,
-        )
-
-        self.chars: list[BBox] = []
-
-        for row in rows:
-            chars = find_chars(
-                self.binary,
-                row,
-                padding=padding,
-                horiz_dist=horiz_dist,
-                min_pixels=min_pixels,
-            )
-            self.chars.extend(chars)
+        rows = find_rows(self.binary)
+        self.chars: list[BBox] = find_chars(self.binary, rows)
 
     def __len__(self) -> int:
         """Return the count of characters on the sheet."""
@@ -134,20 +99,12 @@ class AllometrySheet(Dataset):
 
 def deskew_image(
         binary_image: Image,
-        deskew_range: tuple[float, float, float],
         *,
-        padding: int = PADDING,
+        deskew_range: tuple[float, float, float] = DESKEW_RANGE,
         fat_row: int = FAT_ROW,
-        vert_dist: int = VERT_DIST,
-        row_threshold: int = ROW_THRESHOLD,
 ) -> Image:
     """Fine tune the rotation of a binary image."""
-    rows = find_rows(
-        binary_image,
-        padding=padding,
-        vert_dist=vert_dist,
-        row_threshold=row_threshold,
-    )
+    rows = find_rows(binary_image)
     fat_rows = sum(1 for r in rows if r.low - r.high > fat_row)
 
     if fat_rows == 0:
@@ -158,7 +115,7 @@ def deskew_image(
 
     for angle in np.arange(*deskew_range):
         rotated = rotate_image(binary_image, angle)
-        rows = find_rows(rotated, row_threshold=row_threshold, padding=padding)
+        rows = find_rows(rotated)
         thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
         if thin_rows > best[0]:
             best = (thin_rows, rotated)
@@ -171,78 +128,50 @@ def rotate_image(image: Image, angle: float) -> Image:
     theta = np.deg2rad(angle)
     cos, sin = np.cos(theta), np.sin(theta)
     data = (cos, sin, 0.0, -sin, cos, 0.0)
-    rotated = image.transform(image.size, Image.AFFINE, data, fillcolor='black')
+    rotated = image.output(image.size, Image.AFFINE, data, fillcolor='black')
     return rotated
 
 
 def find_rows(
         binary_image: Image,
         *,
-        padding: int = PADDING,
-        vert_dist: int = VERT_DIST,
-        thin_row: int = THIN_ROW,
         row_threshold: int = ROW_THRESHOLD,
 ) -> list[Pair]:
-    """Find rows in the image."""
-    data = np.array(binary_image) // ON
-
-    proj = data.sum(axis=1)
-    proj = proj < (binary_image.size[0] // row_threshold)
-    proj = proj.astype(int) * ON
-
-    proj[0] = 0
-    proj[-1] = 0
-
-    peaks = signal.find_peaks(proj, distance=vert_dist, plateau_size=1)
-
-    tops = peaks[1]['right_edges']
-    bots = peaks[1]['left_edges'][1:]
-    pairs = [Pair(t-padding, b+padding) for t, b in zip(tops, bots)]
-
-    rows = [pairs[0]]
-
-    for curr in pairs[1:]:
-        min_low = min(curr.low, rows[-1].low)
-        max_high = max(curr.high, rows[-1].high)
-        if max_high - min_low <= thin_row:
-            rows.pop()
-            rows.append(Pair(min_low, max_high))
-        else:
-            rows.append(curr)
-
-    return rows
+    """Find rows of text in the image."""
+    return profile_projection(binary_image, threshold=row_threshold)
 
 
 def find_chars(
         binary_image: Image,
-        row: Pair,
+        rows: list[Pair],
         *,
-        padding: int = PADDING,
-        horiz_dist: int = HORIZ_DIST,
+        col_threshold: int = COL_THRESHOLD,
+) -> list[BBox]:
+    """Find all characters in a row of text."""
+    boxes = []
+    width = binary_image.size[0]
+    for row in rows:
+        top, bottom = row
+        row_image = binary_image.crop((0, top, width, bottom))
+
+        pairs = profile_projection(row_image, axis=0, threshold=col_threshold)
+
+        row_boxes = merge_boxes(pairs, row)
+        row_boxes = remove_empty_boxes(binary_image, row_boxes)
+        boxes.extend(row_boxes)
+
+    return boxes
+
+
+def remove_empty_boxes(
+        binary_image: Image,
+        row_boxes: list[BBox],
+        *,
         min_pixels: int = MIN_PIXELS,
 ) -> list[BBox]:
-    """Find all of the characters in a row."""
-    line = binary_image.crop((0, row.low, binary_image.size[0], row.high))
-
-    data = np.array(line) // ON
-
-    proj = data.sum(axis=0)
-    proj = proj == 0
-    proj = proj.astype(int) * ON
-
-    proj[0] = 0
-    proj[-1] = 0
-
-    peaks = signal.find_peaks(proj, distance=horiz_dist, plateau_size=1)
-
-    lefts = peaks[1]['right_edges']
-    rights = peaks[1]['left_edges'][1:]
-    cols = [Pair(left-padding, right+padding) for left, right in zip(lefts, rights)]
-
+    """Remove boxes with too few "on" pixels."""
     boxes: list[BBox] = []
-
-    for col in cols:
-        box = BBox(col.low, row.low, col.high, row.high)
+    for box in row_boxes:
         char = binary_image.crop(box)
         data = np.array(char) // ON
         pixels = np.sum(data)
@@ -250,3 +179,64 @@ def find_chars(
             boxes.append(box)
 
     return boxes
+
+
+def merge_boxes(
+        pairs: list[Pair],
+        row: Pair,
+        *,
+        inside: int = INSIDE,
+        outside: int = OUTSIDE,
+) -> list[BBox]:
+    """Merge character boxes that are near to each other.
+
+    We are finding boxes around each character. However, there are a lot of missing
+    pixels in the characters and the profile projection method relies on finding
+    blank columns to delimit the characters. This function merges nearby boxes to
+    join broken characters into a single box.
+    """
+    top, bottom = row
+    row_boxes = [BBox(pairs[0].low, top, pairs[0].high, bottom)]
+
+    for left, right in pairs[1:]:
+        prev_left, prev_right = row_boxes[-1].left, row_boxes[-1].right
+
+        if (left - prev_right) <= inside and (right - prev_left) <= outside:
+            row_boxes.pop()
+            row_boxes.append(BBox(prev_left, top, right, bottom))
+        else:
+            row_boxes.append(BBox(left, top, right, bottom))
+
+    return row_boxes
+
+
+def profile_projection(
+        bin_section: Image,
+        threshold: int = 20,
+        axis: int = 1,
+        padding: int = PADDING,
+) -> list[Pair]:
+    """Characters in the image via a profile projection.
+    Look for blank rows or columns to delimit a line of printed text or a character.
+    """
+    data = np.array(bin_section).copy() / 255
+
+    proj = data.sum(axis=axis)
+    proj = proj > threshold
+    proj = proj.astype(int)
+
+    prev = np.insert(proj[:-1], 0, 0)
+    curr = np.insert(proj[1:], 0, 0)
+    wheres = np.where(curr != prev)[0]
+    wheres = wheres.tolist()
+
+    splits = np.array_split(proj, wheres)
+
+    wheres = wheres if wheres[0] == 0 else ([0] + wheres)
+    wheres = [Where(w, s[0]) for w, s in zip(wheres, splits)]
+
+    starts = [w.line - padding for w in wheres if w.type == 1]
+    ends = [w.line + padding for w in wheres if w.type == 0][1:]
+    pairs = [Pair(t - padding, b + padding) for t, b in zip(starts, ends)]
+
+    return pairs
