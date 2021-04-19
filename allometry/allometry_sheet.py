@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
-from PIL import Image
+from PIL import Image, ImageOps
 from torch.utils.data import Dataset
 
 from allometry.const import BBox, CONTEXT_SIZE, OFF, ON
@@ -18,11 +18,15 @@ PADDING = 2  # How many pixels to pad a character
 BIN_THRESHOLD = 230  # A pixel is considered "on" if its values is at least this
 ROW_THRESHOLD = 40  # Max number of "on" pixels for a row to be considered empty
 COL_THRESHOLD = 0  # Max number of "on" pixels for a column to be considered empty
-INSIDE = 4  # Only merge boxes if they are this close
-OUTSIDE = 40  # Only merge boxes if they will not make a box this fat
+INSIDE_COL = 4  # Only merge boxes if they are this close
+OUTSIDE_COL = 40  # Only merge boxes if they will not make a box this fat
 DESKEW_RANGE = (-0.2, 0.21, 0.01)  # Rotations to check when deskewing
 FAT_ROW = 60  # Minimize this when deskewing
-MIN_PIXELS = 40  # A character box must have this many "on" pixels
+MIN_PIXELS = 20  # A character box must have this many "on" pixels
+TRIM_FRACT = 3  # Remove this many pixels from each side with searching for rows
+INSIDE_ROW = 2  # Only merge rows if they are this close
+OUTSIDE_ROW = 60  # Only merge rows if they not make a row this fat
+CROP_EDGES = 8  # There are scanning artifacts at the border of some sheets
 
 
 class AllometrySheet(Dataset):
@@ -53,10 +57,14 @@ class AllometrySheet(Dataset):
 
         # Convert to a binary image with white text on black background
         self.binary = self.image.point(lambda x: ON if x < BIN_THRESHOLD else OFF)
+        right, bottom = self.binary.size
+        crop = (CROP_EDGES, CROP_EDGES, right - CROP_EDGES, bottom - CROP_EDGES)
+        self.binary = self.binary.crop(crop)
+        self.binary = ImageOps.expand(self.binary, border=CROP_EDGES, fill='black')
         self.binary = deskew_image(self.binary)
 
-        rows = find_rows(self.binary)
-        self.chars: list[BBox] = find_chars(self.binary, rows)
+        self.rows = find_rows(self.binary)
+        self.chars: list[BBox] = find_chars(self.binary, self.rows)
 
     def __len__(self) -> int:
         """Return the count of characters on the sheet."""
@@ -102,23 +110,23 @@ def deskew_image(
         *,
         deskew_range: tuple[float, float, float] = DESKEW_RANGE,
         fat_row: int = FAT_ROW,
+        row_threshold: int = ROW_THRESHOLD,
 ) -> Image:
     """Fine tune the rotation of a binary image."""
-    rows = find_rows(binary_image)
-    fat_rows = sum(1 for r in rows if r.low - r.high > fat_row)
+    rows = profile_projection(binary_image, threshold=row_threshold)
+    fat_rows = sum(1 for r in rows if r.high - r.low > fat_row)
 
-    if fat_rows == 0:
-        return binary_image
-
-    thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
+    thin_rows = len(rows) - fat_rows
     best = (thin_rows, binary_image)
 
-    for angle in np.arange(*deskew_range):
-        rotated = rotate_image(binary_image, angle)
-        rows = find_rows(rotated)
-        thin_rows = sum(1 for r in rows if r.low - r.high < fat_row)
-        if thin_rows > best[0]:
-            best = (thin_rows, rotated)
+    if fat_rows != 0:
+
+        for angle in np.arange(*deskew_range):
+            rotated = rotate_image(binary_image, angle)
+            rows = profile_projection(rotated, threshold=row_threshold)
+            thin_rows = sum(1 for r in rows if r.high - r.low < fat_row)
+            if thin_rows > best[0]:
+                best = (thin_rows, rotated)
 
     return best[1]
 
@@ -128,7 +136,7 @@ def rotate_image(image: Image, angle: float) -> Image:
     theta = np.deg2rad(angle)
     cos, sin = np.cos(theta), np.sin(theta)
     data = (cos, sin, 0.0, -sin, cos, 0.0)
-    rotated = image.output(image.size, Image.AFFINE, data, fillcolor='black')
+    rotated = image.transform(image.size, Image.AFFINE, data, fillcolor='black')
     return rotated
 
 
@@ -136,9 +144,75 @@ def find_rows(
         binary_image: Image,
         *,
         row_threshold: int = ROW_THRESHOLD,
+        fat_row: int = FAT_ROW,
+        trim_fract: float = TRIM_FRACT,
 ) -> list[Pair]:
     """Find rows of text in the image."""
-    return profile_projection(binary_image, threshold=row_threshold)
+    rows = profile_projection(binary_image, threshold=row_threshold)
+    fat_rows = sum(1 for r in rows if r.high - r.low > fat_row)
+
+    best_rows, best_fat_rows = rows, fat_rows
+
+    if fat_rows != 0:
+
+        trim_left = binary_image.size[0] // trim_fract
+        trim_right = binary_image.size[0] - trim_left
+        width = binary_image.size[0]
+
+        count_threshold = int(len(rows) * 0.8)
+
+        # Try cropping the image to get better rows
+        crops = [(trim_left, width), (0, trim_right), (trim_left, trim_right)]
+        for left, right in crops:
+            crop = (left, 0, right, binary_image.size[1])
+            cropped = binary_image.crop(crop)
+            cropped_rows = profile_projection(cropped, threshold=row_threshold)
+            fat_rows = sum(1 for r in cropped_rows if r.high - r.low > fat_row)
+            if fat_rows < best_fat_rows and len(cropped_rows) >= count_threshold:
+                best_rows, best_fat_rows = cropped_rows, fat_rows
+
+    rows = overlapping_rows(best_rows)
+    rows = merge_rows(rows)
+
+    return rows
+
+
+def merge_rows(
+        rows: list[Pair],
+        *,
+        inside_row: int = INSIDE_ROW,
+        outside_row: int = OUTSIDE_ROW,
+) -> list[Pair]:
+    """Merge thin rows."""
+    new_rows = [rows[0]]
+
+    for row in rows[1:]:
+        top, bottom = row
+        prev_top, prev_bottom = new_rows[-1]
+
+        if (top - prev_bottom) <= inside_row and (bottom - prev_top) <= outside_row:
+            new_rows.pop()
+            new_rows.append(Pair(prev_top, bottom))
+        else:
+            new_rows.append(row)
+
+    return new_rows
+
+
+def overlapping_rows(old_rows: list[Pair]) -> list[Pair]:
+    """Fix overlapping rows."""
+    rows = [old_rows[0]]
+    for row in old_rows[1:]:
+        top, bottom = row
+        prev_top, prev_bottom = rows[-1]
+        if top < prev_bottom:
+            mid = (top + prev_bottom) // 2
+            rows.pop()
+            rows.append(Pair(prev_top, mid))
+            rows.append(Pair(mid, bottom))
+        else:
+            rows.append(row)
+    return rows
 
 
 def find_chars(
@@ -155,11 +229,30 @@ def find_chars(
         row_image = binary_image.crop((0, top, width, bottom))
 
         pairs = profile_projection(row_image, axis=0, threshold=col_threshold)
+        if not pairs:
+            continue
 
         row_boxes = merge_boxes(pairs, row)
         row_boxes = remove_empty_boxes(binary_image, row_boxes)
-        boxes.extend(row_boxes)
+        if row_boxes:
+            row_boxes = overlapping_columns(row_boxes)
+            boxes.extend(row_boxes)
 
+    return boxes
+
+
+def overlapping_columns(old_boxes: list[BBox]) -> list[BBox]:
+    """Fix overlapping rows."""
+    boxes = [old_boxes[0]]
+    for box in old_boxes[1:]:
+        prev = boxes[-1]
+        if box.left < prev.right:
+            mid = (box.left + prev.right) // 2
+            boxes.pop()
+            boxes.append(BBox(prev.left, prev.top, mid, prev.bottom))
+            boxes.append(BBox(mid, box.top, box.right, box.bottom))
+        else:
+            boxes.append(box)
     return boxes
 
 
@@ -185,8 +278,8 @@ def merge_boxes(
         pairs: list[Pair],
         row: Pair,
         *,
-        inside: int = INSIDE,
-        outside: int = OUTSIDE,
+        inside_col: int = INSIDE_COL,
+        outside_col: int = OUTSIDE_COL,
 ) -> list[BBox]:
     """Merge character boxes that are near to each other.
 
@@ -201,7 +294,7 @@ def merge_boxes(
     for left, right in pairs[1:]:
         prev_left, prev_right = row_boxes[-1].left, row_boxes[-1].right
 
-        if (left - prev_right) <= inside and (right - prev_left) <= outside:
+        if (left - prev_right) <= inside_col and (right - prev_left) <= outside_col:
             row_boxes.pop()
             row_boxes.append(BBox(prev_left, top, right, bottom))
         else:

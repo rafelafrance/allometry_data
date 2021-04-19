@@ -19,7 +19,11 @@ def dissect(args):
     """Dissect the sheets."""
     make_dirs(args)
 
-    for image_path in sorted(args.sheet_dir.glob(f'*.{args.image_suffix}')):
+    image_paths = sorted(args.sheet_dir.glob(f'*.{args.image_suffix}'))
+    if args.filter:
+        image_paths = [p for p in image_paths if str(p).find(args.filter) > -1]
+
+    for image_path in image_paths:
         logging.info(f'{image_path}')
 
         sheet = AllometrySheet(image_path, args.rotate)
@@ -31,6 +35,12 @@ def dissect(args):
             _, box = sheet[i]
             box = box.tolist()
             draw.rectangle(box, outline=BOX_COLOR)
+
+        if args.show_rows:
+            width = sheet.binary.size[0]
+            for top, bottom in sheet.rows:
+                draw.line((0, top, width, top), width=1, fill='red')
+                draw.line((0, bottom, width, bottom), width=1, fill='yellow')
 
         dissect_path = args.dissection_dir / (image_path.stem + '.jpg')
         dissected.save(dissect_path, 'JPEG')
@@ -69,6 +79,12 @@ def parse_args():
     arg_parser.add_argument(
         '--dissection-dir', required=True, type=Path,
         help="""Where to put the dissected images.""")
+
+    arg_parser.add_argument(
+        '--filter', help="""Filter images.""")
+
+    arg_parser.add_argument(
+        '--show-rows', action='store_true', help="""Show rows.""")
 
     args = arg_parser.parse_args()
 
