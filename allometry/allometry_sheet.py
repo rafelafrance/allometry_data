@@ -233,10 +233,9 @@ def find_chars(
             continue
 
         row_boxes = merge_boxes(pairs, row)
+        row_boxes = overlapping_columns(row_boxes)
         row_boxes = remove_empty_boxes(binary_image, row_boxes)
-        if row_boxes:
-            row_boxes = overlapping_columns(row_boxes)
-            boxes.extend(row_boxes)
+        boxes.extend(row_boxes)
 
     return boxes
 

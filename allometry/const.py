@@ -13,6 +13,8 @@ TEXT_DIR = DATA_DIR / 'text'
 
 FONTS_DIR = ROOT_DIR / 'fonts'
 
+SPELL = ROOT_DIR / 'allometry' / 'spell.txt'
+
 CONTEXT_SIZE = ImageSize(32 * 4, 48)
 
 ON, OFF = 255, 0
